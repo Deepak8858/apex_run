@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/env.dart';
 import '../../core/utils/gps_utils.dart';
 import '../../core/utils/permission_utils.dart';
 import '../../data/datasources/activity_datasource.dart';
+import '../../data/services/activity_post_processor.dart';
 import '../../data/services/gps_tracking_service.dart';
 import '../../domain/models/activity.dart';
 import '../../domain/models/tracking_metrics.dart';
@@ -131,7 +133,15 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
 
     try {
       final dataSource = _ref.read(activityDataSourceProvider);
-      await dataSource.createActivity(activity);
+      final activityId = await dataSource.createActivity(activity);
+
+      // Post-process: segment matching, ACWR, leaderboard update
+      _postProcessActivity(
+        activityId: activityId,
+        userId: user.id,
+        activity: activity,
+      );
+
       state = state.copyWith(
         isSaving: false,
         lastSavedActivity: activity,
@@ -153,6 +163,33 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
       _service.stopTracking(userId: user?.id ?? '');
     }
     state = const TrackingControllerState();
+  }
+
+  /// Post-process activity asynchronously (non-blocking)
+  /// Matches segments, updates leaderboards, calculates ACWR
+  void _postProcessActivity({
+    required String activityId,
+    required String userId,
+    required Activity activity,
+  }) {
+    // Fire-and-forget — don't block the UI
+    Future(() async {
+      try {
+        final supabase = _ref.read(supabaseClientProvider);
+        final processor = ActivityPostProcessor(supabase);
+        final result = await processor.processActivity(
+          activityId: activityId,
+          userId: userId,
+          elapsedSeconds: activity.durationSeconds,
+          avgPace: activity.avgPaceMinPerKm ?? 0,
+          avgHeartRate: activity.avgHeartRate,
+          maxSpeed: activity.maxSpeedKmh,
+        );
+        debugPrint('Post-processing complete: $result');
+      } catch (e) {
+        debugPrint('Post-processing error (non-fatal): $e');
+      }
+    });
   }
 
   /// Phase 4d: Privacy shroud — blur GPS points near user's home location.

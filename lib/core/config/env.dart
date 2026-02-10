@@ -16,7 +16,7 @@ class Env {
 
   static const String supabaseServiceKey = String.fromEnvironment(
     'SUPABASE_SERVICE_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZGRkZG1taWFybmJ2d21nemdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NTE3OTcsImV4cCI6MjA4NjIyNzc5N30.i7Ni-NHsmbwaXEoyOut_26PH1PK_Xycw3ChzkvPtklM',
+    defaultValue: '',
   );
 
   // ── Mapbox Configuration ────────────────────────────────────────────
