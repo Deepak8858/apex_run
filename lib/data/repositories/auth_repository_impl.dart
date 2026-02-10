@@ -1,0 +1,132 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../datasources/auth_datasource.dart';
+
+/// Implementation of AuthRepository
+class AuthRepositoryImpl implements AuthRepository {
+  final AuthDataSource _dataSource;
+
+  AuthRepositoryImpl(this._dataSource);
+
+  @override
+  User? get currentUser => _dataSource.currentUser;
+
+  @override
+  Stream<AuthState> get authStateChanges => _dataSource.authStateChanges;
+
+  @override
+  bool get isAuthenticated => _dataSource.isAuthenticated;
+
+  @override
+  Future<User> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _dataSource.signInWithEmail(
+        email: email,
+        password: password,
+      );
+
+      if (response.user == null) {
+        throw Exception('Sign in failed: No user returned');
+      }
+
+      return response.user!;
+    } on AuthException catch (e) {
+      throw Exception('Authentication error: ${e.message}');
+    } catch (e) {
+      throw Exception('Sign in failed: $e');
+    }
+  }
+
+  @override
+  Future<User> signUpWithEmail({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    try {
+      final Map<String, dynamic>? metadata = displayName != null
+          ? {'display_name': displayName}
+          : null;
+
+      final response = await _dataSource.signUpWithEmail(
+        email: email,
+        password: password,
+        metadata: metadata,
+      );
+
+      if (response.user == null) {
+        throw Exception('Sign up failed: No user returned');
+      }
+
+      return response.user!;
+    } on AuthException catch (e) {
+      throw Exception('Authentication error: ${e.message}');
+    } catch (e) {
+      throw Exception('Sign up failed: $e');
+    }
+  }
+
+  @override
+  Future<User> signInWithGoogle() async {
+    try {
+      final response = await _dataSource.signInWithGoogle();
+
+      if (response.user == null) {
+        throw Exception('Google sign in failed: No user returned');
+      }
+
+      return response.user!;
+    } on AuthException catch (e) {
+      throw Exception('Google authentication error: ${e.message}');
+    } catch (e) {
+      throw Exception('Google sign in failed: $e');
+    }
+  }
+
+  @override
+  Future<User> signInWithApple() async {
+    try {
+      final response = await _dataSource.signInWithApple();
+
+      if (response.user == null) {
+        throw Exception('Apple sign in failed: No user returned');
+      }
+
+      return response.user!;
+    } on AuthException catch (e) {
+      throw Exception('Apple authentication error: ${e.message}');
+    } catch (e) {
+      throw Exception('Apple sign in failed: $e');
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    try {
+      await _dataSource.signOut();
+    } catch (e) {
+      throw Exception('Sign out failed: $e');
+    }
+  }
+
+  @override
+  Future<void> resetPassword({required String email}) async {
+    try {
+      await _dataSource.resetPassword(email: email);
+    } catch (e) {
+      throw Exception('Password reset failed: $e');
+    }
+  }
+
+  @override
+  Future<void> updatePassword({required String newPassword}) async {
+    try {
+      await _dataSource.updatePassword(newPassword: newPassword);
+    } catch (e) {
+      throw Exception('Password update failed: $e');
+    }
+  }
+}

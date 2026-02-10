@@ -1,0 +1,28 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+apexrun-api
+
+# Test artifacts
+*.test
+*.out
+cover.html
+
+# Environment – never commit real secrets
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Module cache
+vendor/

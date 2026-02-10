@@ -1,0 +1,87 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ==============================
+# ApexRun Specific
+# ==============================
+
+# Backend Environment & Secrets
+backend/.env
+backend/tmp/
+backend/*.exe
+backend/*.log
+
+# Google Cloud / AI Credentials (NEVER commit these!)
+google-credentials.json
+service-account.json
+backend/google-credentials.json
+backend/service-account.json
+
+# Certificates & Keys
+*.pem
+*.key
+*.crt
+
+# Flutter Code Generation
+*.g.dart
+*.freezed.dart
+
+# Environment Files
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.vscode/
+.fleet/
+
+# Temporary Files
+tmpclaude-*
+*.swp
+*.bak
+nul
+

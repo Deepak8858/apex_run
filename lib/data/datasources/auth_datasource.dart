@@ -1,0 +1,194 @@
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Authentication Data Source using Supabase
+///
+/// Handles all authentication operations including sign in, sign up, sign out,
+/// and session management. Supports email/password, Google, and Apple sign-in.
+class AuthDataSource {
+  final SupabaseClient _supabase;
+
+  AuthDataSource(this._supabase);
+
+  /// Get current user session
+  Session? get currentSession => _supabase.auth.currentSession;
+
+  /// Get current user
+  User? get currentUser => _supabase.auth.currentUser;
+
+  /// Stream of authentication state changes
+  Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+
+  /// Sign in with email and password
+  Future<AuthResponse> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Sign up with email and password
+  Future<AuthResponse> signUpWithEmail({
+    required String email,
+    required String password,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      final response = await _supabase.auth.signUp(
+        email: email,
+        password: password,
+        data: metadata,
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Sign in with Google (native flow)
+  ///
+  /// Uses GoogleSignIn package for native sign-in, then exchanges the
+  /// ID token with Supabase for a session.
+  Future<AuthResponse> signInWithGoogle() async {
+    // Web client ID from Google Cloud Console
+    const webClientId =
+        '813781261149-7fn9r1luvj8gj1723nir3evetllte5qr.apps.googleusercontent.com';
+
+    final googleSignIn = GoogleSignIn(
+      serverClientId: webClientId,
+    );
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      throw const AuthException('Google sign-in was cancelled');
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken == null) {
+      throw const AuthException('Failed to get Google ID token');
+    }
+
+    final response = await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+
+    return response;
+  }
+
+  /// Sign in with Apple (native flow)
+  ///
+  /// Uses SignInWithApple package for native sign-in, then exchanges the
+  /// authorization code with Supabase for a session.
+  Future<AuthResponse> signInWithApple() async {
+    // Generate a random nonce for security
+    final rawNonce = _generateNonce();
+    final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+      nonce: hashedNonce,
+    );
+
+    final idToken = credential.identityToken;
+    if (idToken == null) {
+      throw const AuthException('Failed to get Apple ID token');
+    }
+
+    final response = await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.apple,
+      idToken: idToken,
+      nonce: rawNonce,
+    );
+
+    return response;
+  }
+
+  /// Generates a cryptographically-secure random nonce
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
+        .join();
+  }
+
+  /// Sign out
+  Future<void> signOut() async {
+    try {
+      await _supabase.auth.signOut();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Reset password
+  Future<void> resetPassword({required String email}) async {
+    try {
+      await _supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'apexrun://reset-password',
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update user password
+  Future<UserResponse> updatePassword({required String newPassword}) async {
+    try {
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update user metadata
+  Future<UserResponse> updateUserMetadata({
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      final response = await _supabase.auth.updateUser(
+        UserAttributes(data: metadata),
+      );
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Refresh session
+  Future<AuthResponse> refreshSession() async {
+    try {
+      final response = await _supabase.auth.refreshSession();
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => currentSession != null && currentUser != null;
+}
