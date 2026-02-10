@@ -87,14 +87,16 @@ class HrvService {
     // HRV component (up to 40 points)
     if (hrv != null && _baselineRmssd != null && _baselineRmssd! > 0) {
       final ratio = hrv.rmssd / _baselineRmssd!;
-      if (ratio >= 1.1) score += 40;       // Above baseline
-      else if (ratio >= 0.9) score += 30;  // Near baseline
+      if (ratio >= 1.1) {
+        score += 40;       // Above baseline
+      } else if (ratio >= 0.9) score += 30;  // Near baseline
       else if (ratio >= 0.7) score += 15;  // Below baseline
       else score += 5;                      // Well below
     } else if (hrv != null) {
       // No baseline yet — use absolute values
-      if (hrv.rmssd > 70) score += 35;
-      else if (hrv.rmssd > 50) score += 25;
+      if (hrv.rmssd > 70) {
+        score += 35;
+      } else if (hrv.rmssd > 50) score += 25;
       else if (hrv.rmssd > 30) score += 15;
       else score += 5;
     }
@@ -198,25 +200,29 @@ class SleepSummary {
   int get qualityScore {
     int score = 0;
     // Duration component (max 40)
-    if (durationMinutes >= 480) score += 40;       // 8+ hours
-    else if (durationMinutes >= 420) score += 35;  // 7-8 hours
+    if (durationMinutes >= 480) {
+      score += 40;       // 8+ hours
+    } else if (durationMinutes >= 420) score += 35;  // 7-8 hours
     else if (durationMinutes >= 360) score += 25;  // 6-7 hours
     else score += 10;
 
     // Deep sleep component (max 25)
-    if (deepSleepRatio >= 0.25) score += 25;
-    else if (deepSleepRatio >= 0.20) score += 20;
+    if (deepSleepRatio >= 0.25) {
+      score += 25;
+    } else if (deepSleepRatio >= 0.20) score += 20;
     else if (deepSleepRatio >= 0.15) score += 15;
     else score += 5;
 
     // REM component (max 20)
-    if (remSleepRatio >= 0.25) score += 20;
-    else if (remSleepRatio >= 0.20) score += 15;
+    if (remSleepRatio >= 0.25) {
+      score += 20;
+    } else if (remSleepRatio >= 0.20) score += 15;
     else score += 5;
 
     // Efficiency component (max 15)
-    if (efficiency >= 0.90) score += 15;
-    else if (efficiency >= 0.85) score += 10;
+    if (efficiency >= 0.90) {
+      score += 15;
+    } else if (efficiency >= 0.85) score += 10;
     else score += 5;
 
     return score.clamp(0, 100);

@@ -99,7 +99,7 @@ class FormAnalyzer {
 
     if (!_calculator.hasEnoughData) {
       debugPrint('FormAnalyzer: Not enough data for analysis '
-          '(${_frameCount} frames)');
+          '($_frameCount frames)');
       return null;
     }
 

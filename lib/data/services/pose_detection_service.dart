@@ -1,6 +1,7 @@
 /// Camera-based pose detection service using Google ML Kit
 /// Bridges the camera stream to the GaitMetricsCalculator for real-time
 /// running form analysis via MediaPipe's 33-landmark BlazePose model.
+library;
 import 'dart:async';
 import 'dart:ui' show Size;
 import 'package:flutter/foundation.dart';

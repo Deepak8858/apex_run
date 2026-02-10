@@ -234,25 +234,29 @@ class GaitMetricsCalculator {
 
     final gct = calculateGroundContactTimeMs();
     if (gct > 0) {
-      if (gct < 200) score += 15;
-      else if (gct < 250) score += 10;
+      if (gct < 200) {
+        score += 15;
+      } else if (gct < 250) score += 10;
       else if (gct < 300) score += 5;
     }
 
     final cadence = calculateCadence();
     if (cadence > 0) {
-      if (cadence >= 180) score += 15;
-      else if (cadence >= 170) score += 10;
+      if (cadence >= 180) {
+        score += 15;
+      } else if (cadence >= 170) score += 10;
       else if (cadence >= 160) score += 5;
     }
 
     final lean = calculateForwardLeanDegrees();
-    if (lean >= 5 && lean <= 12) score += 10;
-    else if (lean > 0 && lean < 20) score += 5;
+    if (lean >= 5 && lean <= 12) {
+      score += 10;
+    } else if (lean > 0 && lean < 20) score += 5;
 
     final hipDrop = calculateHipDropDegrees();
-    if (hipDrop < 5) score += 10;
-    else if (hipDrop < 8) score += 5;
+    if (hipDrop < 5) {
+      score += 10;
+    } else if (hipDrop < 8) score += 5;
 
     return score.clamp(0, 100);
   }
@@ -270,7 +274,7 @@ class GaitMetricsCalculator {
     final cadence = calculateCadence();
     if (cadence > 0 && cadence < 170) {
       tips.add(
-          'Your cadence is ${cadence} spm. Try to increase to 170-180 for better efficiency.');
+          'Your cadence is $cadence spm. Try to increase to 170-180 for better efficiency.');
     }
 
     final lean = calculateForwardLeanDegrees();

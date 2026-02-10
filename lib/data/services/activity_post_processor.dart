@@ -4,6 +4,7 @@
 /// - Leaderboard update
 /// - ACWR calculation
 /// - Training load tracking
+library;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config/env.dart';
