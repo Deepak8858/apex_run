@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:apex_run/core/theme/app_theme.dart';
 import 'package:apex_run/domain/models/planned_workout.dart';
-import 'package:apex_run/presentation/providers/app_providers.dart';
 
 /// Helper to wrap a widget for testing with theme & Riverpod
 Widget testApp(Widget child, {List<Override> overrides = const []}) {

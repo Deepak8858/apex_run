@@ -251,7 +251,7 @@ void main() {
       expect(Env.isMapboxConfigured, true);
       expect(Env.isGeminiConfigured, true);
       expect(Env.supabaseUrl, contains('supabase.co'));
-      expect(Env.backendUrl, contains('8080'));
+      expect(Env.backendApiUrl, contains('8080'));
     });
 
     test('feature flags have sensible defaults', () {
@@ -354,11 +354,9 @@ List<PoseLandmark> _createRunningPoseLandmarks(int frameIndex) {
     }
 
     return PoseLandmark(
-      index: i,
       x: x,
       y: y,
       z: z,
-      visibility: 0.95,
     );
   });
 }

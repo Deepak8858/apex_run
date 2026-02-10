@@ -20,10 +20,10 @@ void main() {
   group('Home Screen Components', () {
     testWidgets('Weekly stats card displays formatted values', (tester) async {
       final stats = WeeklyStats(
-        totalActivities: 5,
+        runCount: 5,
         totalDistanceMeters: 32500.0,
         totalDurationSeconds: 10800,
-        averagePaceMinPerKm: 5.2,
+        avgPaceMinPerKm: 5.2,
       );
 
       await tester.pumpWidget(
@@ -49,7 +49,7 @@ void main() {
                       children: [
                         _StatItem(
                           label: 'Runs',
-                          value: '${stats.totalActivities}',
+                          value: '${stats.runCount}',
                           color: AppTheme.electricLime,
                         ),
                         _StatItem(
@@ -79,7 +79,7 @@ void main() {
 
       expect(find.text('This Week'), findsOneWidget);
       expect(find.text('5'), findsOneWidget);
-      expect(find.text('32.50 km'), findsOneWidget);
+      expect(find.text('32.5 km'), findsOneWidget);
       expect(find.text('3h 0m'), findsOneWidget);
       expect(find.text('5:12 /km'), findsOneWidget);
     });
@@ -128,10 +128,11 @@ void main() {
       final activity = Activity(
         id: 'act-1',
         userId: 'user-1',
+        activityName: 'Morning Run',
         activityType: 'run',
         distanceMeters: 5200,
         durationSeconds: 1560,
-        averagePaceMinPerKm: 5.0,
+        avgPaceMinPerKm: 5.0,
         startTime: DateTime(2024, 3, 15, 7, 30),
       );
 
