@@ -7,7 +7,6 @@
 library;
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/config/env.dart';
 
 class ActivityPostProcessor {
   final SupabaseClient _supabase;

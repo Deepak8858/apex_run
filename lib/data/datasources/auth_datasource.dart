@@ -29,12 +29,15 @@ class AuthDataSource {
     required String password,
   }) async {
     try {
+      print('🔐 Attempting email sign-in for: $email');
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
+      print('✅ Sign-in successful! User ID: ${response.user?.id}');
       return response;
     } catch (e) {
+      print('❌ Sign-in failed: $e');
       rethrow;
     }
   }
@@ -46,13 +49,16 @@ class AuthDataSource {
     Map<String, dynamic>? metadata,
   }) async {
     try {
+      print('📝 Attempting email sign-up for: $email');
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
         data: metadata,
       );
+      print('✅ Sign-up successful! User ID: ${response.user?.id}, Session: ${response.session != null}');
       return response;
     } catch (e) {
+      print('❌ Sign-up failed: $e');
       rethrow;
     }
   }

@@ -1,0 +1,68 @@
+name: Deploy Backend to Digital Ocean
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Go Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DO_SSH_PRIVATE_KEY }}
+
+      - name: Add Digital Ocean to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Digital Ocean Droplet
+        env:
+          DO_DROPLET_IP: ${{ secrets.DO_DROPLET_IP }}
+        run: |
+          ssh root@$DO_DROPLET_IP << 'EOF'
+            set -e
+            cd /root/apex_run
+            git pull origin main
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Wait for health check
+            for i in {1..30}; do
+              if curl -f http://localhost:8080/health > /dev/null 2>&1; then
+                echo "✅ Backend deployed successfully!"
+                exit 0
+              fi
+              echo "Waiting for backend... ($i/30)"
+              sleep 2
+            done
+            
+            echo "❌ Deployment failed - health check timeout"
+            docker-compose -f docker-compose.prod.yml logs backend
+            exit 1
+          EOF
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+          fi
+
+# Required GitHub Secrets:
+# - DO_SSH_PRIVATE_KEY: Your SSH private key for the droplet
+# - DO_DROPLET_IP: Your droplet's IP address

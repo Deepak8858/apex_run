@@ -28,17 +28,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleEmailAuth() async {
     if (!_formKey.currentState!.validate()) return;
 
+    print('👆 Login button pressed - isSignUp: $_isSignUp');
     setState(() => _isLoading = true);
 
     try {
       final authNotifier = ref.read(authStateProvider.notifier);
 
       if (_isSignUp) {
+        print('📝 Calling signUpWithEmail');
         await authNotifier.signUpWithEmail(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
       } else {
+        print('🔐 Calling signInWithEmail');
         await authNotifier.signInWithEmail(
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -46,6 +49,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
 
       if (mounted) {
+        print('✅ Auth successful - showing success message');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isSignUp ? 'Account created!' : 'Welcome back!'),
@@ -53,6 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     } catch (e) {
+      print('❌ Auth error in login screen: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

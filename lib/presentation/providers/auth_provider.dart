@@ -76,10 +76,13 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
     required String password,
   }) async {
     try {
+      print('🔵 AuthStateNotifier: Starting email sign-in');
       state = AuthStatus.loading;
       await _repository.signInWithEmail(email: email, password: password);
       state = AuthStatus.authenticated;
+      print('🟢 AuthStateNotifier: Sign-in successful, state: authenticated');
     } catch (e) {
+      print('🔴 AuthStateNotifier: Sign-in error: $e');
       state = AuthStatus.unauthenticated;
       rethrow;
     }
@@ -91,6 +94,7 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
     String? displayName,
   }) async {
     try {
+      print('🔵 AuthStateNotifier: Starting email sign-up');
       state = AuthStatus.loading;
       await _repository.signUpWithEmail(
         email: email,
@@ -98,7 +102,9 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
         displayName: displayName,
       );
       state = AuthStatus.authenticated;
+      print('🟢 AuthStateNotifier: Sign-up successful, state: authenticated');
     } catch (e) {
+      print('🔴 AuthStateNotifier: Sign-up error: $e');
       state = AuthStatus.unauthenticated;
       rethrow;
     }
