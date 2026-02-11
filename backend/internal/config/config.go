@@ -112,6 +112,12 @@ func mustGetEnv(key string) string {
 		fmt.Printf("CRITICAL: required env var %s is not set — set it in .env or environment\n", key)
 		return ""
 	}
+	// Log that we found the env var (mask sensitive values)
+	masked := v
+	if len(v) > 8 {
+		masked = v[:4] + "****" + v[len(v)-4:]
+	}
+	fmt.Printf("CONFIG: %s = %s (len=%d)\n", key, masked, len(v))
 	return v
 }
 

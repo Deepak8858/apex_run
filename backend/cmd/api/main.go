@@ -54,6 +54,10 @@ func main() {
 	// ----------------------------------------------------------------
 	// 3. Connect to PostgreSQL
 	// ----------------------------------------------------------------
+	log.Info("connecting to database...",
+		zap.Int("db_url_len", len(cfg.DatabaseURL)),
+		zap.Bool("db_url_empty", cfg.DatabaseURL == ""),
+	)
 	db, err := database.New(
 		cfg.DatabaseURL,
 		cfg.DBMaxOpenConns,

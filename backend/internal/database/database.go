@@ -16,8 +16,14 @@ type DB struct {
 	logger *zap.Logger
 }
 
-// New opens a PostgreSQL connection pool and verifies connectivity.
+// New opens a PostgreSQL connection pool and verifies connectivity with retry logic.
 func New(dsn string, maxOpen, maxIdle int, maxLifetime time.Duration, logger *zap.Logger) (*DB, error) {
+	// Log DSN host (not password) for debugging
+	logger.Info("database: attempting connection",
+		zap.Int("max_open", maxOpen),
+		zap.Int("max_idle", maxIdle),
+	)
+
 	pool, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("database: open: %w", err)
@@ -27,19 +33,33 @@ func New(dsn string, maxOpen, maxIdle int, maxLifetime time.Duration, logger *za
 	pool.SetMaxIdleConns(maxIdle)
 	pool.SetConnMaxLifetime(maxLifetime)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Retry connection up to 5 times with backoff
+	var pingErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		pingErr = pool.PingContext(ctx)
+		cancel()
 
-	if err := pool.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("database: ping: %w", err)
+		if pingErr == nil {
+			logger.Info("database connected",
+				zap.Int("attempt", attempt),
+				zap.Int("max_open", maxOpen),
+				zap.Int("max_idle", maxIdle),
+			)
+			return &DB{Pool: pool, logger: logger}, nil
+		}
+
+		logger.Warn("database: ping failed, retrying...",
+			zap.Int("attempt", attempt),
+			zap.Error(pingErr),
+		)
+
+		if attempt < 5 {
+			time.Sleep(time.Duration(attempt*2) * time.Second)
+		}
 	}
 
-	logger.Info("database connected",
-		zap.Int("max_open", maxOpen),
-		zap.Int("max_idle", maxIdle),
-	)
-
-	return &DB{Pool: pool, logger: logger}, nil
+	return nil, fmt.Errorf("database: ping failed after 5 attempts: %w", pingErr)
 }
 
 // Close shuts down the connection pool.
