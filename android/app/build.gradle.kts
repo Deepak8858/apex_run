@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.apexrun.app"
-        minSdk = 24
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

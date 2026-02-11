@@ -36,6 +36,12 @@ class Env {
     defaultValue: 'http://localhost:8080',
   );
 
+  // ── ML Service Configuration ────────────────────────────────────────
+  static const String mlServiceUrl = String.fromEnvironment(
+    'ML_SERVICE_URL',
+    defaultValue: 'http://localhost:8001',
+  );
+
   // ── Google Cloud / Gemini Configuration ─────────────────────────────
   static const String geminiApiKey = String.fromEnvironment(
     'GEMINI_API_KEY',
@@ -44,7 +50,7 @@ class Env {
 
   static const String geminiModel = String.fromEnvironment(
     'GEMINI_MODEL',
-    defaultValue: 'gemini-2.5-flash',
+    defaultValue: 'gemini-2.0-flash',
   );
 
   // ── Redis Configuration (for direct client access if needed) ────────
@@ -156,6 +162,7 @@ flutter run \\
   --dart-define=MAPBOX_ACCESS_TOKEN=pk.eyJ... \\
   --dart-define=MAPBOX_STYLE_URL=mapbox://styles/... \\
   --dart-define=BACKEND_API_URL=http://your-server:8080 \\
+  --dart-define=ML_SERVICE_URL=http://your-server:8001 \\
   --dart-define=GEMINI_API_KEY=AI... \\
   --dart-define=GEMINI_MODEL=gemini-1.5-flash \\
   --dart-define=REDIS_URL=134.199.187.2:6379 \\

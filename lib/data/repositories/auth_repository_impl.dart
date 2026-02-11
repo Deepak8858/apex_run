@@ -72,13 +72,24 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> signInWithGoogle() async {
     try {
-      final response = await _dataSource.signInWithGoogle();
+      // OAuth flow launches browser and returns immediately
+      // The actual session is established via the redirect callback
+      // and will be picked up by the auth state listener
+      await _dataSource.signInWithGoogle();
+      
+      // Wait for auth state change with timeout
+      final user = await _dataSource.authStateChanges
+          .where((state) => state.session != null)
+          .map((state) => state.session?.user)
+          .firstWhere((user) => user != null)
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () => throw Exception(
+              'Google sign-in timed out. Please try again.',
+            ),
+          );
 
-      if (response.user == null) {
-        throw Exception('Google sign in failed: No user returned');
-      }
-
-      return response.user!;
+      return user!;
     } on AuthException catch (e) {
       throw Exception('Google authentication error: ${e.message}');
     } catch (e) {

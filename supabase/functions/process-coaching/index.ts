@@ -11,14 +11,36 @@ declare const Deno: {
 };
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.0-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+// Lightweight JWT validation — verifies token exists and is not expired
+function validateJwt(authHeader: string | null): { valid: boolean; userId?: string; error?: string } {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return { valid: false, error: "Missing or invalid Authorization header" };
+  }
+  const token = authHeader.replace("Bearer ", "");
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return { valid: false, error: "Malformed JWT" };
+    const payload = JSON.parse(atob(parts[1]));
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      return { valid: false, error: "Token expired" };
+    }
+    return { valid: true, userId: payload.sub };
+  } catch {
+    return { valid: false, error: "Invalid JWT" };
+  }
+}
 
 interface CoachingRequest {
   user_id: string;
@@ -45,6 +67,19 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Validate JWT auth
+    const authHeader = req.headers.get("authorization");
+    const auth = validateJwt(authHeader);
+    if (!auth.valid) {
+      return new Response(
+        JSON.stringify({ code: 401, message: auth.error }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // Validate API key is configured
     if (!GEMINI_API_KEY) {
       return new Response(

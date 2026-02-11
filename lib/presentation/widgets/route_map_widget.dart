@@ -1,4 +1,6 @@
 import 'dart:ui' as ui;
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../core/config/env.dart';
@@ -16,6 +18,7 @@ class RouteMapWidget extends StatefulWidget {
   final List<GpsPoint> routePoints;
   final bool isLiveTracking;
   final bool showStartEndMarkers;
+  final bool animateRoute;
   final double initialZoom;
   final EdgeInsets padding;
 
@@ -24,6 +27,7 @@ class RouteMapWidget extends StatefulWidget {
     required this.routePoints,
     this.isLiveTracking = false,
     this.showStartEndMarkers = true,
+    this.animateRoute = false,
     this.initialZoom = 15.0,
     this.padding = const EdgeInsets.all(50),
   });
@@ -35,7 +39,10 @@ class RouteMapWidget extends StatefulWidget {
 class _RouteMapWidgetState extends State<RouteMapWidget> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
+  PolylineAnnotationManager? _glowManager;
   PointAnnotationManager? _pointManager;
+  Timer? _animTimer;
+  int _animIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -85,11 +92,18 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       ));
     }
 
+    // Create glow manager first (renders behind main line)
+    _glowManager =
+        await map.annotations.createPolylineAnnotationManager();
     _polylineManager =
         await map.annotations.createPolylineAnnotationManager();
     _pointManager = await map.annotations.createPointAnnotationManager();
 
-    _drawRoute();
+    if (widget.animateRoute && !widget.isLiveTracking) {
+      _startAnimatedDraw();
+    } else {
+      _drawRoute();
+    }
   }
 
   @override
@@ -103,11 +117,65 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     }
   }
 
+  /// Animate the route line drawing progressively like Strava replay
+  void _startAnimatedDraw() {
+    if (widget.routePoints.length < 2) return;
+
+    _animIndex = 2;
+    // Fit camera to full route first
+    _fitBounds();
+
+    // Progressively draw the route
+    const stepDuration = Duration(milliseconds: 16); // ~60fps
+    final totalPoints = widget.routePoints.length;
+    final pointsPerFrame = math.max(1, totalPoints ~/ 120); // ~2 seconds
+
+    _animTimer = Timer.periodic(stepDuration, (timer) {
+      if (_animIndex >= totalPoints) {
+        timer.cancel();
+        _drawMarkers();
+        return;
+      }
+      _animIndex = math.min(_animIndex + pointsPerFrame, totalPoints);
+      _drawAnimFrame(_animIndex);
+    });
+  }
+
+  /// Draw a single frame of the animation
+  Future<void> _drawAnimFrame(int pointCount) async {
+    if (_polylineManager == null || pointCount < 2) return;
+
+    await _polylineManager!.deleteAll();
+    await _glowManager?.deleteAll();
+
+    final subset = widget.routePoints.sublist(0, pointCount);
+    final coordinates = subset
+        .map((p) => Position(p.longitude, p.latitude))
+        .toList();
+
+    // Outer glow line (wider, transparent)
+    await _glowManager?.create(PolylineAnnotationOptions(
+      geometry: LineString(coordinates: coordinates),
+      lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
+      lineWidth: 10.0,
+      lineOpacity: 0.4,
+    ));
+
+    // Main route line
+    await _polylineManager!.create(PolylineAnnotationOptions(
+      geometry: LineString(coordinates: coordinates),
+      lineColor: AppTheme.electricLime.toARGB32(),
+      lineWidth: 4.0,
+      lineOpacity: 0.95,
+    ));
+  }
+
   Future<void> _drawRoute() async {
     if (_polylineManager == null || widget.routePoints.length < 2) return;
 
     // Clear existing annotations
     await _polylineManager!.deleteAll();
+    await _glowManager?.deleteAll();
     await _pointManager?.deleteAll();
 
     // Draw polyline
@@ -115,12 +183,33 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
         .map((p) => Position(p.longitude, p.latitude))
         .toList();
 
+    // Outer glow line (Strava-style neon effect)
+    await _glowManager?.create(PolylineAnnotationOptions(
+      geometry: LineString(coordinates: coordinates),
+      lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
+      lineWidth: 10.0,
+      lineOpacity: 0.4,
+    ));
+
+    // Main route line
     await _polylineManager!.create(PolylineAnnotationOptions(
       geometry: LineString(coordinates: coordinates),
       lineColor: AppTheme.electricLime.toARGB32(),
       lineWidth: 4.0,
-      lineOpacity: 0.9,
+      lineOpacity: 0.95,
     ));
+
+    _drawMarkers();
+
+    // Fit camera to bounds for detail view
+    if (!widget.isLiveTracking && widget.routePoints.length >= 2) {
+      _fitBounds();
+    }
+  }
+
+  Future<void> _drawMarkers() async {
+    if (_pointManager == null) return;
+    await _pointManager!.deleteAll();
 
     // Start & end markers
     if (widget.showStartEndMarkers && widget.routePoints.length >= 2) {
@@ -146,11 +235,6 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
           textColor: AppTheme.error.toARGB32(),
         ));
       }
-    }
-
-    // Fit camera to bounds for detail view
-    if (!widget.isLiveTracking && widget.routePoints.length >= 2) {
-      _fitBounds();
     }
   }
 
@@ -199,7 +283,9 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
   @override
   void dispose() {
+    _animTimer?.cancel();
     _polylineManager = null;
+    _glowManager = null;
     _pointManager = null;
     super.dispose();
   }

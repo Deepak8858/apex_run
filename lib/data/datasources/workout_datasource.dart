@@ -59,6 +59,7 @@ class WorkoutDataSource {
         .select()
         .eq('user_id', userId)
         .eq('planned_date', today)
+        .limit(1)
         .maybeSingle();
 
     if (response == null) return null;

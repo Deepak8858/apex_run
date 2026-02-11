@@ -23,8 +23,8 @@ void main() {
       expect(Env.backendApiUrl, contains('localhost'));
     });
 
-    test('geminiModel defaults to gemini-2.5-flash', () {
-      expect(Env.geminiModel, 'gemini-2.5-flash');
+    test('geminiModel defaults to gemini-2.0-flash', () {
+      expect(Env.geminiModel, 'gemini-2.0-flash');
     });
 
     test('gpsDistanceFilterMeters has reasonable default', () {

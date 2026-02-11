@@ -77,10 +77,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final authNotifier = ref.read(authStateProvider.notifier);
+      
+      // Show browser launching message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Opening $provider sign-in in browser...'),
+            backgroundColor: AppTheme.electricLime.withAlpha(200),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
       if (provider == 'google') {
         await authNotifier.signInWithGoogle();
       } else if (provider == 'apple') {
         await authNotifier.signInWithApple();
+      }
+      
+      // Success - user will be redirected back to app
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Complete sign-in in your browser, then return to the app'),
+            backgroundColor: AppTheme.success,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -88,6 +111,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(
             content: Text('$provider sign-in failed: ${e.toString()}'),
             backgroundColor: AppTheme.error,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -101,131 +125,272 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo/Brand
-                  Icon(
-                    Icons.directions_run_rounded,
-                    size: 80,
-                    color: AppTheme.electricLime,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'ApexRun',
-                    style: Theme.of(context).textTheme.headlineLarge,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Performance Running Platform',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.textSecondary,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: [0.0, 0.4, 1.0],
+            colors: [
+              Color(0xFF1E2F05), // Deep electric lime hint
+              AppTheme.background,
+              AppTheme.background,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(32),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo/Brand
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.electricLime.withOpacity(0.25),
+                            blurRadius: 60,
+                            spreadRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.directions_run_rounded,
+                        size: 96,
+                        color: AppTheme.electricLime,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'ApexRun',
+                      style:
+                          Theme.of(context).textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -1.0,
+                                color: Colors.white,
+                              ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Peak Performance',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.textSecondary,
+                            letterSpacing: 2.0,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 64),
+
+                    // Email Field
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+                        prefixIcon: const Icon(Icons.email_outlined, color: AppTheme.textSecondary),
+                        filled: true,
+                        fillColor: AppTheme.surfaceLight.withOpacity(0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
                         ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 48),
-
-                  // Email Field
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_rounded),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: AppTheme.electricLime),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your email';
+                        }
+                        if (!value.contains('@')) {
+                          return 'Please enter a valid email';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // Password Field
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock_rounded),
+                    // Password Field
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: const TextStyle(color: AppTheme.textSecondary),
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.textSecondary),
+                        filled: true,
+                        fillColor: AppTheme.surfaceLight.withOpacity(0.3),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(color: AppTheme.electricLime),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        if (value.length < 6) {
+                          return 'Password must be at least 6 characters';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
-                  // Sign In/Sign Up Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleEmailAuth,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_isSignUp ? 'Sign Up' : 'Sign In'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Toggle Sign Up/Sign In
-                  TextButton(
-                    onPressed: () {
-                      setState(() => _isSignUp = !_isSignUp);
-                    },
-                    child: Text(
-                      _isSignUp
-                          ? 'Already have an account? Sign In'
-                          : 'Don\'t have an account? Sign Up',
+                    // Sign In/Sign Up Button
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _handleEmailAuth,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.electricLime,
+                        foregroundColor: AppTheme.background,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.background,
+                              ),
+                            )
+                          : Text(
+                              _isSignUp ? 'Create Account' : 'Sign In',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 24),
-                  Divider(color: AppTheme.textTertiary),
-                  const SizedBox(height: 24),
+                    // Toggle Sign Up/Sign In
+                    TextButton(
+                      onPressed: () {
+                        setState(() => _isSignUp = !_isSignUp);
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.textSecondary,
+                      ),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(color: AppTheme.textSecondary),
+                          children: [
+                            TextSpan(
+                                text: _isSignUp
+                                    ? 'Already have an account? '
+                                    : 'Don\'t have an account? '),
+                            TextSpan(
+                              text: _isSignUp ? 'Sign In' : 'Sign Up',
+                              style: const TextStyle(
+                                color: AppTheme.electricLime,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                  // Social Auth Buttons
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : () => _handleOAuthSignIn('google'),
-                    icon: const Icon(Icons.g_mobiledata_rounded),
-                    label: const Text('Continue with Google'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    const SizedBox(height: 32),
+                    Row(
+                      children: [
+                        const Expanded(child: Divider(color: AppTheme.surfaceLight)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text('OR', style: TextStyle(color: AppTheme.textTertiary)),
+                        ),
+                        const Expanded(child: Divider(color: AppTheme.surfaceLight)),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Show Apple button only on iOS or always for wider compatibility
-                  OutlinedButton.icon(
-                    onPressed: _isLoading ? null : () => _handleOAuthSignIn('apple'),
-                    icon: const Icon(Icons.apple_rounded),
-                    label: const Text('Continue with Apple'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    const SizedBox(height: 32),
+
+                    // Social Auth Buttons
+                    _SocialAuthButton(
+                      icon: Icons.g_mobiledata_rounded,
+                      label: 'Continue with Google',
+                      onPressed: _isLoading ? null : () => _handleOAuthSignIn('google'),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    _SocialAuthButton(
+                      icon: Icons.apple_rounded,
+                      label: 'Continue with Apple',
+                      onPressed: _isLoading ? null : () => _handleOAuthSignIn('apple'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SocialAuthButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
+
+  const _SocialAuthButton({
+    required this.icon,
+    required this.label,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(color: AppTheme.surfaceLight),
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

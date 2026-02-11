@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
+import 'package:health/health.dart';
 import 'models/hrv_data.dart';
 
 /// HrvService — Health Data Integration for Recovery Tracking
@@ -22,6 +25,10 @@ class HrvService {
   final List<HrvData> _history = [];
   double? _baselineRmssd;
   Timer? _morningCheckTimer;
+  bool _authorized = false;
+
+  /// The health plugin instance
+  final Health _health = Health();
 
   /// Get the latest HRV reading
   HrvData? get latestReading =>
@@ -30,28 +37,106 @@ class HrvService {
   /// Get the 7-day baseline RMSSD
   double? get baselineRmssd => _baselineRmssd;
 
+  /// Request permissions for health data access
+  Future<bool> requestPermissions() async {
+    try {
+      final types = <HealthDataType>[
+        HealthDataType.HEART_RATE_VARIABILITY_SDNN,
+        HealthDataType.HEART_RATE,
+        HealthDataType.SLEEP_ASLEEP,
+        HealthDataType.SLEEP_IN_BED,
+        HealthDataType.SLEEP_DEEP,
+        HealthDataType.SLEEP_REM,
+      ];
+
+      // On Android, also request Health Connect permissions
+      if (Platform.isAndroid) {
+        await Health().configure();
+      }
+
+      _authorized = await _health.requestAuthorization(
+        types,
+        permissions: types.map((_) => HealthDataAccess.READ).toList(),
+      );
+
+      debugPrint('HrvService: Health permissions ${_authorized ? "granted" : "denied"}');
+      return _authorized;
+    } catch (e) {
+      debugPrint('HrvService: Permission request failed: $e');
+      return false;
+    }
+  }
+
   /// Fetch today's HRV from the platform health source
   ///
   /// On iOS: Reads from HealthKit (requires entitlements)
   /// On Android: Reads from Health Connect API
   Future<HrvData?> fetchTodaysHrv() async {
     try {
-      // TODO: Integrate with `health` package when available
-      // For now, return null — the AI Coach uses the fallback path
-      //
-      // final health = HealthFactory();
-      // final types = [HealthDataType.HEART_RATE_VARIABILITY_SDNN];
-      // final permissions = [HealthDataAccess.READ];
-      // final authorized = await health.requestAuthorization(types, permissions: permissions);
-      // if (!authorized) return null;
-      //
-      // final now = DateTime.now();
-      // final start = DateTime(now.year, now.month, now.day);
-      // final data = await health.getHealthDataFromTypes(start, now, types);
-      // ... process HealthDataPoint into HrvData
+      if (!_authorized) {
+        final granted = await requestPermissions();
+        if (!granted) {
+          debugPrint('HrvService: No health permissions — using fallback');
+          return null;
+        }
+      }
 
-      debugPrint('HrvService: Platform health integration pending');
-      return null;
+      final now = DateTime.now();
+      final midnight = DateTime(now.year, now.month, now.day);
+
+      // Fetch HRV SDNN data points from today
+      final hrvData = await _health.getHealthDataFromTypes(
+        types: [HealthDataType.HEART_RATE_VARIABILITY_SDNN],
+        startTime: midnight,
+        endTime: now,
+      );
+
+      // Fetch resting heart rate
+      final hrData = await _health.getHealthDataFromTypes(
+        types: [HealthDataType.HEART_RATE],
+        startTime: midnight,
+        endTime: now,
+      );
+
+      if (hrvData.isEmpty) {
+        debugPrint('HrvService: No HRV data available for today');
+        return null;
+      }
+
+      // Use the most recent HRV reading
+      final latestHrv = hrvData.last;
+      final rmssd = (latestHrv.value as NumericHealthValue).numericValue.toDouble();
+
+      // Calculate resting HR (lowest HR reading from today)
+      int restingHr = 60; // default
+      if (hrData.isNotEmpty) {
+        restingHr = hrData
+            .map((d) => (d.value as NumericHealthValue).numericValue.toInt())
+            .reduce((a, b) => a < b ? a : b);
+      }
+
+      // Normalize RMSSD to 0-100 score
+      final hrvScore = _rmssdToScore(rmssd);
+      final recovery = assessRecovery(rmssd);
+
+      final data = HrvData(
+        rmssd: rmssd,
+        sdnn: rmssd, // SDNN approximation
+        restingHeartRate: restingHr,
+        hrvScore: hrvScore,
+        recoveryStatus: recovery,
+        readinessScore: hrvScore,
+        weeklyAvgRmssd: _baselineRmssd,
+        measuredAt: latestHrv.dateFrom,
+        source: Platform.isIOS ? HrvSource.healthKit : HrvSource.healthConnect,
+      );
+
+      _history.add(data);
+      _updateBaseline();
+
+      debugPrint('HrvService: HRV fetched — RMSSD: ${rmssd.toStringAsFixed(1)}ms, '
+          'Score: $hrvScore, Recovery: ${recovery.name}');
+      return data;
     } catch (e) {
       debugPrint('HrvService: Failed to fetch HRV: $e');
       return null;
@@ -61,14 +146,88 @@ class HrvService {
   /// Fetch sleep data from the platform health source
   Future<SleepSummary?> fetchLastNightSleep() async {
     try {
-      // TODO: Integrate with `health` package
-      // HealthDataType.SLEEP_IN_BED, SLEEP_ASLEEP, SLEEP_DEEP, etc.
-      debugPrint('HrvService: Sleep data integration pending');
-      return null;
+      if (!_authorized) {
+        final granted = await requestPermissions();
+        if (!granted) return null;
+      }
+
+      final now = DateTime.now();
+      // Look back 12 hours for last night's sleep
+      final sleepStart = now.subtract(const Duration(hours: 12));
+
+      final sleepTypes = [
+        HealthDataType.SLEEP_IN_BED,
+        HealthDataType.SLEEP_ASLEEP,
+        HealthDataType.SLEEP_DEEP,
+        HealthDataType.SLEEP_REM,
+      ];
+
+      final sleepData = await _health.getHealthDataFromTypes(
+        types: sleepTypes,
+        startTime: sleepStart,
+        endTime: now,
+      );
+
+      if (sleepData.isEmpty) {
+        debugPrint('HrvService: No sleep data available');
+        return null;
+      }
+
+      // Calculate sleep metrics from data points
+      int totalInBedMinutes = 0;
+      int deepSleepMinutes = 0;
+      int remSleepMinutes = 0;
+      int asleepMinutes = 0;
+
+      for (final point in sleepData) {
+        final duration = point.dateTo.difference(point.dateFrom).inMinutes;
+        switch (point.type) {
+          case HealthDataType.SLEEP_IN_BED:
+            totalInBedMinutes += duration;
+            break;
+          case HealthDataType.SLEEP_ASLEEP:
+            asleepMinutes += duration;
+            break;
+          case HealthDataType.SLEEP_DEEP:
+            deepSleepMinutes += duration;
+            break;
+          case HealthDataType.SLEEP_REM:
+            remSleepMinutes += duration;
+            break;
+          default:
+            break;
+        }
+      }
+
+      // Use SLEEP_ASLEEP or SLEEP_IN_BED as total
+      final totalMinutes = asleepMinutes > 0 ? asleepMinutes : totalInBedMinutes;
+      if (totalMinutes < 30) return null; // Too little data
+
+      final summary = SleepSummary(
+        durationMinutes: totalMinutes,
+        deepSleepRatio: totalMinutes > 0 ? deepSleepMinutes / totalMinutes : 0,
+        remSleepRatio: totalMinutes > 0 ? remSleepMinutes / totalMinutes : 0,
+        efficiency: totalInBedMinutes > 0 ? asleepMinutes / totalInBedMinutes : 0.85,
+      );
+
+      debugPrint('HrvService: Sleep fetched — ${totalMinutes}min total, '
+          '${(summary.deepSleepRatio * 100).toInt()}% deep, '
+          '${(summary.remSleepRatio * 100).toInt()}% REM');
+      return summary;
     } catch (e) {
       debugPrint('HrvService: Failed to fetch sleep data: $e');
       return null;
     }
+  }
+
+  /// Convert RMSSD to 0-100 score
+  int _rmssdToScore(double rmssd) {
+    // Logarithmic scale: ln(RMSSD) maps well to perceived recovery
+    // ln(20) ≈ 3.0 → 0 points, ln(80) ≈ 4.4 → 100 points
+    if (rmssd <= 0) return 0;
+    final lnRmssd = math.log(rmssd);
+    final score = ((lnRmssd - 3.0) / 1.4 * 100).round();
+    return score.clamp(0, 100);
   }
 
   /// Add a manual HRV reading (e.g., from a connected wearable)

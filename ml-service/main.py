@@ -6,12 +6,16 @@ FastAPI service for:
 - Injury risk prediction
 - Performance forecasting
 - Custom TFLite model generation for on-device inference
+- TFLite model serving and download
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
+from pathlib import Path
 import numpy as np
+import json
 
 app = FastAPI(
     title="ApexRun ML Service",
@@ -26,6 +30,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+MODELS_DIR = Path(__file__).parent / "models"
 
 
 # ================================================================
@@ -272,3 +278,215 @@ async def analyze_training_load(request: TrainingLoadRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+
+# ================================================================
+# TFLite Model Management
+# ================================================================
+
+class TFLiteModelInfo(BaseModel):
+    """Info about an available TFLite model."""
+    name: str
+    filename: str
+    size_kb: float
+    description: str
+    input_features: List[str]
+    download_url: str
+
+
+class BuildModelsResponse(BaseModel):
+    """Response from model build endpoint."""
+    status: str
+    models: dict
+
+
+@app.get("/api/v1/models", response_model=List[TFLiteModelInfo])
+async def list_tflite_models():
+    """List all available TFLite models for download."""
+    models = []
+    model_catalog = {
+        "gait_form_model.tflite": {
+            "name": "Gait Form Analysis",
+            "description": "Scores running form (0-100) from biomechanical landmarks",
+            "input_features": [
+                "ground_contact_time_ms", "vertical_oscillation_cm",
+                "cadence_spm", "stride_length_m", "forward_lean_degrees",
+                "hip_drop_degrees", "arm_swing_symmetry_pct", "avg_pace_min_per_km"
+            ],
+        },
+        "injury_risk_model.tflite": {
+            "name": "Injury Risk Prediction",
+            "description": "Classifies injury risk as low/moderate/high",
+            "input_features": [
+                "ground_contact_time_ms", "vertical_oscillation_cm",
+                "cadence_spm", "stride_length_m", "hip_drop_degrees",
+                "weekly_distance_km", "acute_chronic_ratio"
+            ],
+        },
+        "performance_model.tflite": {
+            "name": "Performance Forecast",
+            "description": "Predicts 5K race time from training data",
+            "input_features": [
+                "weekly_distance_km", "avg_pace_min_per_km",
+                "run_count_per_week", "longest_run_km",
+                "resting_heart_rate", "hrv_rmssd"
+            ],
+        },
+    }
+
+    for filename, info in model_catalog.items():
+        filepath = MODELS_DIR / filename
+        if filepath.exists():
+            size_kb = round(filepath.stat().st_size / 1024, 1)
+            models.append(TFLiteModelInfo(
+                name=info["name"],
+                filename=filename,
+                size_kb=size_kb,
+                description=info["description"],
+                input_features=info["input_features"],
+                download_url=f"/api/v1/models/{filename}",
+            ))
+
+    return models
+
+
+@app.get("/api/v1/models/{filename}")
+async def download_tflite_model(filename: str):
+    """Download a TFLite model file for on-device deployment."""
+    filepath = MODELS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail=f"Model '{filename}' not found. Run /api/v1/models/build first.")
+    return FileResponse(
+        path=str(filepath),
+        media_type="application/octet-stream",
+        filename=filename,
+    )
+
+
+@app.get("/api/v1/models/{model_name}/normalization")
+async def get_normalization_params(model_name: str):
+    """Get normalization parameters for a model (mean/std for inputs)."""
+    norm_path = MODELS_DIR / f"{model_name}_norm_params.json"
+    if not norm_path.exists():
+        raise HTTPException(status_code=404, detail=f"Normalization params for '{model_name}' not found.")
+    with open(norm_path) as f:
+        return json.load(f)
+
+
+@app.post("/api/v1/models/build", response_model=BuildModelsResponse)
+async def build_tflite_models():
+    """
+    Train and export all TFLite models.
+
+    This is a compute-intensive operation (~1-2 minutes).
+    Models are saved to the models/ directory for download.
+    """
+    try:
+        from tflite_builder import build_all_models
+        results = build_all_models(epochs=50)
+        return BuildModelsResponse(status="success", models=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Model build failed: {str(e)}")
+
+
+# ================================================================
+# TFLite On-Device Inference (server-side fallback)
+# ================================================================
+
+class TFLiteInferenceRequest(BaseModel):
+    """Request for server-side TFLite inference."""
+    model: str  # "gait_form", "injury_risk", or "performance"
+    features: List[float]
+
+
+class TFLiteInferenceResponse(BaseModel):
+    """Response from TFLite inference."""
+    model: str
+    prediction: List[float]
+    interpretation: dict
+
+
+@app.post("/api/v1/inference", response_model=TFLiteInferenceResponse)
+async def tflite_inference(request: TFLiteInferenceRequest):
+    """
+    Run TFLite inference server-side (fallback for devices without TFLite).
+
+    Use this when the mobile device cannot run on-device inference.
+    """
+    model_map = {
+        "gait_form": ("gait_form_model.tflite", 8),
+        "injury_risk": ("injury_risk_model.tflite", 7),
+        "performance": ("performance_model.tflite", 6),
+    }
+
+    if request.model not in model_map:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {request.model}")
+
+    filename, expected_features = model_map[request.model]
+    if len(request.features) != expected_features:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model '{request.model}' expects {expected_features} features, got {len(request.features)}"
+        )
+
+    model_path = MODELS_DIR / filename
+    if not model_path.exists():
+        raise HTTPException(status_code=404, detail=f"Model not built. POST /api/v1/models/build first.")
+
+    try:
+        from tflite_builder import run_tflite_inference
+        input_data = np.array(request.features, dtype=np.float32)
+        output = run_tflite_inference(str(model_path), input_data)
+        prediction = output.flatten().tolist()
+
+        # Interpret results
+        interpretation = _interpret_prediction(request.model, prediction, request.features)
+
+        return TFLiteInferenceResponse(
+            model=request.model,
+            prediction=prediction,
+            interpretation=interpretation,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+
+
+def _interpret_prediction(model_name: str, prediction: List[float], features: List[float]) -> dict:
+    """Convert raw predictions to human-readable interpretations."""
+    if model_name == "gait_form":
+        score = max(0, min(100, prediction[0]))
+        level = "excellent" if score >= 80 else "good" if score >= 60 else "needs_work" if score >= 40 else "poor"
+        return {"form_score": round(score, 1), "level": level}
+
+    elif model_name == "injury_risk":
+        if len(prediction) >= 3:
+            risk_idx = int(np.argmax(prediction))
+            levels = ["low", "moderate", "high"]
+            return {
+                "risk_level": levels[risk_idx],
+                "confidence": round(max(prediction) * 100, 1),
+                "probabilities": {
+                    "low": round(prediction[0] * 100, 1),
+                    "moderate": round(prediction[1] * 100, 1),
+                    "high": round(prediction[2] * 100, 1),
+                },
+            }
+        return {"risk_level": "unknown"}
+
+    elif model_name == "performance":
+        t_5k = max(720, prediction[0])
+        mins = int(t_5k // 60)
+        secs = int(t_5k % 60)
+        # Riegel extrapolation
+        t_10k = t_5k * (10 / 5) ** 1.06
+        t_half = t_5k * (21.1 / 5) ** 1.06
+        t_marathon = t_5k * (42.2 / 5) ** 1.06
+        return {
+            "predicted_5k": f"{mins}:{secs:02d}",
+            "predicted_5k_seconds": round(t_5k),
+            "predicted_10k_seconds": round(t_10k),
+            "predicted_half_marathon_seconds": round(t_half),
+            "predicted_marathon_seconds": round(t_marathon),
+        }
+
+    return {}

@@ -53,6 +53,7 @@ class ActivityDetailScreen extends ConsumerWidget {
                       routePoints: activity.rawGpsPoints,
                       isLiveTracking: false,
                       showStartEndMarkers: true,
+                      animateRoute: true,
                       padding: const EdgeInsets.all(60),
                     )
                   : Container(
@@ -121,11 +122,18 @@ class ActivityDetailScreen extends ConsumerWidget {
                     _SectionLabel(label: 'Pace'),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.surfaceLight),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: PaceChartWidget(
                         points: activity.rawGpsPoints,
@@ -138,11 +146,18 @@ class ActivityDetailScreen extends ConsumerWidget {
                     _SectionLabel(label: 'Elevation'),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.surfaceLight),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: ElevationChartWidget(
                         points: activity.rawGpsPoints,
@@ -267,10 +282,17 @@ class _MetricsGrid extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceLight),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           Row(
@@ -427,8 +449,15 @@ class _SplitTimesWidget extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.surfaceLight),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -472,7 +501,7 @@ class _SplitTimesWidget extends StatelessWidget {
             return Container(
               color: i.isEven
                   ? Colors.transparent
-                  : AppTheme.surfaceLight.withOpacity(0.2),
+                  : AppTheme.surfaceLight.withOpacity(0.05),
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
@@ -573,11 +602,25 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: AppTheme.textPrimary,
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: AppTheme.electricLime,
+            borderRadius: BorderRadius.circular(2),
           ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+      ],
     );
   }
 }

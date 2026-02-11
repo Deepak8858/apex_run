@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -19,22 +18,10 @@ class DioClient {
   }
 
   /// Get the platform-appropriate backend URL.
-  /// On Android emulator, localhost maps to 10.0.2.2.
-  /// On iOS simulator, localhost works normally.
+  /// For local development, use `adb reverse tcp:8080 tcp:8080`
+  /// to forward the physical device's localhost to the host machine.
   static String get _effectiveBaseUrl {
-    final configured = Env.backendApiUrl;
-
-    // Only remap if it's a localhost URL and we're on a mobile platform
-    if (!kIsWeb && configured.contains('localhost')) {
-      try {
-        if (Platform.isAndroid) {
-          return configured.replaceFirst('localhost', '10.0.2.2');
-        }
-      } catch (_) {
-        // Platform not available in some test contexts
-      }
-    }
-    return configured;
+    return Env.backendApiUrl;
   }
 
   static Dio _createDio() {

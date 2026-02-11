@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/activity.dart';
+import '../../domain/models/gps_point.dart';
 import '../../domain/models/planned_workout.dart';
 import '../../domain/models/weekly_stats.dart';
 import '../providers/app_providers.dart';
@@ -163,53 +165,109 @@ class _WeeklySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppTheme.performanceGradient,
-        borderRadius: BorderRadius.circular(16),
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppTheme.surfaceLight),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_rounded,
-                  size: 18, color: AppTheme.electricLime),
-              const SizedBox(width: 8),
-              Text(
-                'This Week',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _MetricColumn(
-                value: '${stats.runCount}',
-                label: 'Runs',
-                color: AppTheme.electricLime,
-              ),
-              _MetricColumn(
-                value: stats.formattedDistance,
-                label: 'Distance',
-                color: AppTheme.distance,
-              ),
-              _MetricColumn(
-                value: stats.formattedDuration,
-                label: 'Time',
-                color: AppTheme.pace,
-              ),
-              _MetricColumn(
-                value: stats.formattedPace,
-                label: 'Avg Pace',
-                color: AppTheme.heartRate,
-              ),
-            ],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            // Ambient Gradient Glow
+            Positioned(
+              right: -50,
+              top: -50,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.electricLime.withOpacity(0.15),
+                      AppTheme.electricLime.withOpacity(0.02),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.electricLime.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.insights_rounded,
+                          size: 18,
+                          color: AppTheme.electricLime,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Weekly Progress',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _MetricColumn(
+                        value: '${stats.runCount}',
+                        label: 'Runs',
+                        color: AppTheme.electricLime,
+                      ),
+                      _VerticalDivider(),
+                      _MetricColumn(
+                        value: stats.formattedDistance,
+                        label: 'Distance',
+                        color: AppTheme.distance,
+                      ),
+                      _VerticalDivider(),
+                      _MetricColumn(
+                        value: stats.formattedDuration,
+                        label: 'Time',
+                        color: AppTheme.pace,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 32,
+      width: 1,
+      color: AppTheme.surfaceLight,
     );
   }
 }
@@ -230,34 +288,46 @@ class _MetricColumn extends StatelessWidget {
       children: [
         Text(
           value,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
               ),
         ),
         const SizedBox(height: 4),
         Text(
-          label,
-          style: Theme.of(context).textTheme.bodySmall,
+          label.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+              ),
         ),
       ],
     );
   }
 }
-
 class _WeeklySummaryCardSkeleton extends StatelessWidget {
   const _WeeklySummaryCardSkeleton();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 120,
+      height: 160,
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.surfaceLight),
       ),
       child: const Center(
-        child: CircularProgressIndicator(color: AppTheme.electricLime),
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: CircularProgressIndicator(
+            color: AppTheme.electricLime,
+            strokeWidth: 3,
+          ),
+        ),
       ),
     );
   }
@@ -273,77 +343,123 @@ class _ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.electricLime.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _activityIcon(activity.activityType),
-                color: AppTheme.electricLime,
-              ),
+    final hasRoute = activity.rawGpsPoints.length >= 2;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          // Mini route map or activity icon
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppTheme.background,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.surfaceLight),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.activityName,
-                    style: Theme.of(context).textTheme.titleMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            clipBehavior: Clip.antiAlias,
+            child: hasRoute
+                ? CustomPaint(
+                    painter: _MiniRoutePainter(
+                      points: activity.rawGpsPoints,
+                    ),
+                  )
+                : Icon(
+                    _ActivityCardHelper.activityIcon(activity.activityType),
+                    color: AppTheme.electricLime,
+                    size: 28,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(activity.startTime),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activity.formattedDistance,
+                  activity.activityName,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.distance,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    Icon(Icons.calendar_today_rounded, size: 12, color: AppTheme.textTertiary),
+                    const SizedBox(width: 4),
                     Text(
-                      activity.formattedDuration,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      activity.formattedPace,
+                      _ActivityCardHelper.formatDate(activity.startTime),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.pace,
-                          ),
+                        color: AppTheme.textTertiary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _CompactStat(
+                      value: activity.formattedDistance,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 12),
+                    Container(width: 1, height: 10, color: AppTheme.surfaceLight),
+                    const SizedBox(width: 12),
+                    _CompactStat(
+                      value: activity.formattedDuration,
+                      color: AppTheme.textSecondary,
                     ),
                   ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: AppTheme.textTertiary.withOpacity(0.5),
+          ),
+        ],
       ),
     );
   }
+}
 
-  IconData _activityIcon(String type) {
+class _CompactStat extends StatelessWidget {
+  final String value;
+  final Color color;
+
+  const _CompactStat({required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      value,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _ActivityCardHelper {
+  static IconData activityIcon(String type) {
     switch (type) {
       case 'run':
         return Icons.directions_run_rounded;
@@ -358,7 +474,7 @@ class _ActivityCard extends StatelessWidget {
     }
   }
 
-  String _formatDate(DateTime date) {
+  static String formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
     if (diff.inDays == 0) return 'Today';
@@ -366,6 +482,81 @@ class _ActivityCard extends StatelessWidget {
     if (diff.inDays < 7) return '${diff.inDays} days ago';
     return '${date.day}/${date.month}/${date.year}';
   }
+}
+
+// ============================================================
+// Mini Route Painter — lightweight route thumbnail for cards
+// ============================================================
+
+class _MiniRoutePainter extends CustomPainter {
+  final List<GpsPoint> points;
+  _MiniRoutePainter({required this.points});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+
+    final lats = points.map((p) => p.latitude).toList();
+    final lngs = points.map((p) => p.longitude).toList();
+    final minLat = lats.reduce(math.min);
+    final maxLat = lats.reduce(math.max);
+    final minLng = lngs.reduce(math.min);
+    final maxLng = lngs.reduce(math.max);
+
+    final latRange = maxLat - minLat;
+    final lngRange = maxLng - minLng;
+    final range = math.max(latRange, lngRange);
+    if (range == 0) return;
+
+    final padding = size.width * 0.12;
+    final drawW = size.width - padding * 2;
+    final drawH = size.height - padding * 2;
+
+    Offset project(GpsPoint p) {
+      final x = padding + ((p.longitude - minLng) / range) * drawW;
+      final y = padding + ((maxLat - p.latitude) / range) * drawH;
+      return Offset(x, y);
+    }
+
+    // Glow
+    final glowPaint = Paint()
+      ..color = AppTheme.electricLime.withOpacity(0.25)
+      ..strokeWidth = 4.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    // Main
+    final mainPaint = Paint()
+      ..color = AppTheme.electricLime.withOpacity(0.9)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    final first = project(points.first);
+    path.moveTo(first.dx, first.dy);
+    for (int i = 1; i < points.length; i++) {
+      final pt = project(points[i]);
+      path.lineTo(pt.dx, pt.dy);
+    }
+
+    canvas.drawPath(path, glowPaint);
+    canvas.drawPath(path, mainPaint);
+
+    // Start dot
+    canvas.drawCircle(
+        first, 3.0, Paint()..color = AppTheme.success);
+    // End dot
+    final last = project(points.last);
+    canvas.drawCircle(
+        last, 3.0, Paint()..color = AppTheme.error);
+  }
+
+  @override
+  bool shouldRepaint(_MiniRoutePainter old) =>
+      old.points.length != points.length;
 }
 
 // ============================================================
@@ -378,66 +569,88 @@ class _WorkoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: _workoutColor(workout.workoutType).withOpacity(0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                _workoutIcon(workout.workoutType),
-                color: _workoutColor(workout.workoutType),
-              ),
+    var iconColor = _workoutColor(workout.workoutType);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: iconColor.withOpacity(0.2)),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    workout.formattedType,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    workout.description,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+            child: Icon(
+              _workoutIcon(workout.workoutType),
+              color: iconColor,
+              size: 28,
             ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (workout.formattedTargetDistance != null)
-                  Text(
-                    workout.formattedTargetDistance!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.distance,
-                        ),
+                Text(
+                  _formatWorkoutTitle(workout.workoutType),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
                   ),
-                if (workout.formattedTargetDuration != null)
-                  Text(
-                    workout.formattedTargetDuration!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  workout.description,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (workout.formattedTargetDistance != null)
+             Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.electricLime.withOpacity(0.3)),
+              ),
+              child: Text(
+                workout.formattedTargetDistance!,
+                style: const TextStyle(
+                  color: AppTheme.electricLime,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+        ],
       ),
     );
+  }
+
+  String _formatWorkoutTitle(String type) {
+    return type.split('_').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
   }
 
   IconData _workoutIcon(String type) {
@@ -492,8 +705,36 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 24,
+              decoration: BoxDecoration(
+                color: AppTheme.electricLime,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.electricLime.withOpacity(0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 0),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ],
+        ),
         ?trailing,
       ],
     );
@@ -507,26 +748,38 @@ class _EmptyStateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(icon, size: 48, color: AppTheme.textTertiary),
-              const SizedBox(height: 12),
-              Text(
-                message,
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 32, color: AppTheme.textSecondary),
           ),
-        ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: AppTheme.textSecondary,
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
-}
+} // Correctly closes class _EmptyStateCard
 
 class _ErrorCard extends StatelessWidget {
   final String message;
@@ -534,24 +787,27 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Icon(Icons.error_outline_rounded, color: AppTheme.error),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppTheme.error),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppTheme.error),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppTheme.error),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -562,10 +818,16 @@ class _LoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
-      child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(
+    return Container(
+      height: 100,
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
           child: CircularProgressIndicator(
             color: AppTheme.electricLime,
             strokeWidth: 2,

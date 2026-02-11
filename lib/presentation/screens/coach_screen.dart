@@ -154,26 +154,51 @@ class _CoachHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: AppTheme.performanceGradient,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceLight),
+        color: AppTheme.cardBackground,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.electricLime.withOpacity(0.08),
+            AppTheme.cardBackground,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: AppTheme.electricLime.withOpacity(0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
           Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 64,
+                height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.electricLime.withOpacity(0.15),
+                  color: AppTheme.electricLime,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.electricLime.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.psychology_rounded,
                   size: 32,
-                  color: AppTheme.electricLime,
+                  color: AppTheme.background,
                 ),
               ),
               const SizedBox(width: 16),
@@ -181,30 +206,54 @@ class _CoachHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Gemini AI Coach',
-                        style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: 4),
                     Text(
-                      'Powered by Gemini 1.5 Flash',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textTertiary,
+                      'Gemini Coach',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
                           ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.electricLime.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Powered by Gemini 1.5 Flash',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppTheme.electricLime,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: isGenerating ? null : onGenerate,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.electricLime,
+                    foregroundColor: AppTheme.background,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
                   icon: isGenerating
                       ? const SizedBox(
-                          width: 18,
-                          height: 18,
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: AppTheme.background,
@@ -212,19 +261,30 @@ class _CoachHeader extends StatelessWidget {
                         )
                       : const Icon(Icons.auto_awesome_rounded),
                   label: Text(
-                      isGenerating ? 'Generating...' : 'Generate Workout'),
+                    isGenerating ? 'Analyzing...' : 'Generate Plan',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: isGenerating ? null : onInsight,
-                icon: const Icon(Icons.lightbulb_outline_rounded),
-                label: const Text('Insights'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.electricLime,
-                  side: const BorderSide(color: AppTheme.electricLime),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: isGenerating ? null : onInsight,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppTheme.textTertiary.withOpacity(0.3),
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.lightbulb_outline_rounded,
+                      color: AppTheme.electricLime,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -245,76 +305,185 @@ class _DetailedWorkoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.surfaceLight),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
           children: [
-            Row(
-              children: [
-                _WorkoutTypeBadge(type: workout.workoutType),
-                const Spacer(),
-                if (workout.isCompleted)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppTheme.success.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('Completed',
-                        style:
-                            TextStyle(color: AppTheme.success, fontSize: 12)),
+            // Side Accent
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppTheme.electricLime, Color(0xFF82B100)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
-              ],
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
-            Text(workout.description,
-                style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                if (workout.formattedTargetDistance != null)
-                  _TargetChip(
-                    icon: Icons.straighten_rounded,
-                    label: workout.formattedTargetDistance!,
-                    color: AppTheme.distance,
-                  ),
-                if (workout.formattedTargetDistance != null)
-                  const SizedBox(width: 12),
-                if (workout.formattedTargetDuration != null)
-                  _TargetChip(
-                    icon: Icons.timer_rounded,
-                    label: workout.formattedTargetDuration!,
-                    color: AppTheme.pace,
-                  ),
-              ],
-            ),
-            if (workout.coachingRationale != null) ...[
-              const SizedBox(height: 16),
-              const Divider(color: AppTheme.surfaceLight),
-              const SizedBox(height: 12),
-              Row(
+            Padding(
+              padding: const EdgeInsets.only(left: 26, right: 20, top: 24, bottom: 24),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.lightbulb_outline_rounded,
-                      size: 18, color: AppTheme.warning),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      workout.coachingRationale!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                            fontStyle: FontStyle.italic,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.electricLime.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppTheme.electricLime.withOpacity(0.2),
                           ),
-                    ),
+                        ),
+                        child: Text(
+                          'RECOMMENDED TODAY',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: AppTheme.electricLime,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                        ),
+                      ),
+                      if (workout.isCompleted)
+                        const Icon(Icons.check_circle_rounded, color: AppTheme.success)
+                    ],
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _formatWorkoutTitle(workout.workoutType),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.1,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    workout.description,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                          height: 1.5,
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      if (workout.formattedTargetDuration != null)
+                        _InteractiveStatBadge(
+                            icon: Icons.timer_outlined,
+                            label: workout.formattedTargetDuration!),
+                      if (workout.formattedTargetDistance != null) ...[
+                        const SizedBox(width: 12),
+                        _InteractiveStatBadge(
+                            icon: Icons.straighten,
+                            label: workout.formattedTargetDistance!),
+                      ]
+                    ],
+                  ),
+                  if (workout.coachingRationale != null) ...[
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.background,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.surfaceLight,
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.psychology_alt_rounded,
+                              size: 20, color: AppTheme.electricLime),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              workout.coachingRationale!,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                    fontStyle: FontStyle.italic,
+                                    height: 1.4,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _formatWorkoutTitle(String type) {
+    // Convert 'recovery_run' to 'Recovery Run'
+    return type.split('_').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+}
+
+class _InteractiveStatBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InteractiveStatBadge({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLight.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.surfaceLight),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppTheme.textPrimary),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -326,38 +495,84 @@ class _CompactWorkoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            _WorkoutTypeBadge(type: workout.workoutType, size: 40),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(workout.formattedType,
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatDate(workout.plannedDate),
-                    style: Theme.of(context).textTheme.bodySmall,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {}, // Just visual for now
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
-              ),
-            ),
-            if (workout.formattedTargetDistance != null)
-              Text(
-                workout.formattedTargetDistance!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.distance,
+                  child: Center(
+                    child: Icon(
+                      _getIconForType(workout.workoutType),
+                      color: AppTheme.textSecondary,
+                      size: 24,
                     ),
-              ),
-          ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatWorkoutTitle(workout.workoutType),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatDate(workout.plannedDate),
+                        style: const TextStyle(
+                          color: AppTheme.textTertiary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.textTertiary.withOpacity(0.5),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  IconData _getIconForType(String type) {
+    if (type.contains('run')) return Icons.directions_run;
+    if (type.contains('rest')) return Icons.hotel;
+    return Icons.fitness_center;
+  }
+  
+  String _formatWorkoutTitle(String type) {
+     return type.split('_').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
   }
 
   String _formatDate(DateTime date) {
@@ -445,96 +660,7 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-// ============================================================
-// Shared Widgets
-// ============================================================
 
-class _WorkoutTypeBadge extends StatelessWidget {
-  final String type;
-  final double size;
-  const _WorkoutTypeBadge({required this.type, this.size = 48});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: _color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(_icon, color: _color, size: size * 0.5),
-    );
-  }
-
-  IconData get _icon {
-    switch (type) {
-      case 'easy':
-        return Icons.self_improvement_rounded;
-      case 'tempo':
-        return Icons.speed_rounded;
-      case 'intervals':
-        return Icons.flash_on_rounded;
-      case 'long_run':
-        return Icons.route_rounded;
-      case 'recovery':
-        return Icons.healing_rounded;
-      case 'race':
-        return Icons.emoji_events_rounded;
-      default:
-        return Icons.fitness_center_rounded;
-    }
-  }
-
-  Color get _color {
-    switch (type) {
-      case 'easy':
-        return AppTheme.success;
-      case 'tempo':
-        return AppTheme.warning;
-      case 'intervals':
-        return AppTheme.heartRate;
-      case 'long_run':
-        return AppTheme.distance;
-      case 'recovery':
-        return AppTheme.info;
-      case 'race':
-        return AppTheme.electricLime;
-      default:
-        return AppTheme.electricLime;
-    }
-  }
-}
-
-class _TargetChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _TargetChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color, fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
 
 class _ErrorBanner extends StatelessWidget {
   final String message;

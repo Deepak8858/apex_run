@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/env.dart';
 import 'core/theme/app_theme.dart';
@@ -10,6 +11,11 @@ import 'presentation/screens/auth_wrapper.dart';
 /// Main application entry point with Supabase and Riverpod initialization
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Mapbox
+  if (Env.mapboxAccessToken.isNotEmpty) {
+    MapboxOptions.setAccessToken(Env.mapboxAccessToken);
+  }
 
   // Initialize Supabase
   if (Env.isConfigured) {

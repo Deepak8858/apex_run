@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
@@ -55,6 +56,12 @@ class FormAnalysisScreen extends ConsumerWidget {
                     .stopSession(),
               ),
               const SizedBox(height: 24),
+
+              // Camera Preview during analysis
+              if (analysisState.isAnalyzing) ...[
+                _CameraPreviewCard(ref: ref),
+                const SizedBox(height: 24),
+              ],
 
               // Live progress during analysis
               if (analysisState.isAnalyzing &&
@@ -590,6 +597,198 @@ class _CoachingTipsCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ============================================================
+// Camera Preview Card
+// ============================================================
+
+class _CameraPreviewCard extends StatelessWidget {
+  final WidgetRef ref;
+  const _CameraPreviewCard({required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final cameraService = ref.watch(poseCameraServiceProvider);
+    final controller = cameraService.cameraController;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.electricLime.withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.electricLime.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Camera feed
+          AspectRatio(
+            aspectRatio: 3 / 4,
+            child: controller != null && controller.value.isInitialized
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CameraPreview(controller),
+                      // Scanning overlay
+                      _ScanOverlay(),
+                    ],
+                  )
+                : Container(
+                    color: AppTheme.surfaceLight,
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            color: AppTheme.electricLime,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Initializing camera...',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+          // Status bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.electricLime.withOpacity(0.08),
+              border: Border(
+                top: BorderSide(
+                  color: AppTheme.electricLime.withOpacity(0.2),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: controller != null && controller.value.isInitialized
+                        ? AppTheme.success
+                        : AppTheme.warning,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (controller != null && controller.value.isInitialized
+                                ? AppTheme.success
+                                : AppTheme.warning)
+                            .withOpacity(0.5),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  controller != null && controller.value.isInitialized
+                      ? 'Pose Detection Active'
+                      : 'Connecting...',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.electricLime,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.visibility_rounded,
+                  size: 16,
+                  color: AppTheme.electricLime,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '33 landmarks',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Scan overlay that shows targeting guides on the camera preview
+class _ScanOverlay extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _ScanOverlayPainter(),
+      child: Container(),
+    );
+  }
+}
+
+class _ScanOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.electricLime.withOpacity(0.6)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    final cornerLength = size.width * 0.08;
+    final margin = size.width * 0.1;
+    final rect = Rect.fromLTRB(
+      margin,
+      size.height * 0.05,
+      size.width - margin,
+      size.height * 0.95,
+    );
+
+    // Top-left corner
+    canvas.drawLine(rect.topLeft, Offset(rect.left + cornerLength, rect.top), paint);
+    canvas.drawLine(rect.topLeft, Offset(rect.left, rect.top + cornerLength), paint);
+
+    // Top-right corner
+    canvas.drawLine(rect.topRight, Offset(rect.right - cornerLength, rect.top), paint);
+    canvas.drawLine(rect.topRight, Offset(rect.right, rect.top + cornerLength), paint);
+
+    // Bottom-left corner
+    canvas.drawLine(rect.bottomLeft, Offset(rect.left + cornerLength, rect.bottom), paint);
+    canvas.drawLine(rect.bottomLeft, Offset(rect.left, rect.bottom - cornerLength), paint);
+
+    // Bottom-right corner
+    canvas.drawLine(rect.bottomRight, Offset(rect.right - cornerLength, rect.bottom), paint);
+    canvas.drawLine(rect.bottomRight, Offset(rect.right, rect.bottom - cornerLength), paint);
+
+    // Center crosshair (subtle)
+    final center = rect.center;
+    final crossSize = size.width * 0.03;
+    final crossPaint = Paint()
+      ..color = AppTheme.electricLime.withOpacity(0.3)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(center.dx - crossSize, center.dy),
+      Offset(center.dx + crossSize, center.dy),
+      crossPaint,
+    );
+    canvas.drawLine(
+      Offset(center.dx, center.dy - crossSize),
+      Offset(center.dx, center.dy + crossSize),
+      crossPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ============================================================
