@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../core/config/env.dart';
 import 'gait_metrics_calculator.dart';
 import 'models/form_analysis_result.dart';
+import 'tflite_model_service.dart';
 
 /// FormAnalyzer — On-device running form analysis using camera + MediaPipe
 ///
@@ -11,6 +12,7 @@ import 'models/form_analysis_result.dart';
 /// 2. MediaPipe BlazePose extracts 33 landmarks per frame
 /// 3. GaitMetricsCalculator processes landmarks into biomechanical metrics
 /// 4. Results stored in FormAnalysisResult and optionally uploaded to Supabase
+/// 5. TFLiteModelService runs gait scoring + injury risk prediction
 ///
 /// Usage:
 /// ```dart
@@ -21,9 +23,12 @@ import 'models/form_analysis_result.dart';
 /// ```
 class FormAnalyzer {
   final GaitMetricsCalculator _calculator = GaitMetricsCalculator();
+  // ignore: unused_field
+  TFLiteModelService? _mlService;
   bool _isAnalyzing = false;
   int _frameCount = 0;
   double _totalConfidence = 0;
+  DateTime? _sessionStartTime;
   StreamController<FormAnalysisProgress>? _progressController;
 
   /// Whether the form analyzer is currently running
@@ -32,6 +37,15 @@ class FormAnalyzer {
   /// Stream of analysis progress updates
   Stream<FormAnalysisProgress>? get progressStream =>
       _progressController?.stream;
+
+  /// Session duration in seconds
+  int get sessionDurationSec {
+    if (_sessionStartTime == null) return 0;
+    return DateTime.now().difference(_sessionStartTime!).inSeconds;
+  }
+
+  /// Inject TFLiteModelService for ML predictions after analysis
+  set mlService(TFLiteModelService? service) => _mlService = service;
 
   /// Start a form analysis session
   ///
@@ -45,6 +59,7 @@ class FormAnalyzer {
     _isAnalyzing = true;
     _frameCount = 0;
     _totalConfidence = 0;
+    _sessionStartTime = DateTime.now();
     _calculator.reset();
     _progressController = StreamController<FormAnalysisProgress>.broadcast();
 
@@ -72,8 +87,8 @@ class FormAnalyzer {
     _frameCount++;
     _totalConfidence += confidence;
 
-    // Emit progress every 30 frames (~1 second)
-    if (_frameCount % 30 == 0 && _calculator.hasEnoughData) {
+    // Emit progress every 15 frames (~0.5 seconds) for smoother UI
+    if (_frameCount % 15 == 0 && _calculator.hasEnoughData) {
       _emitProgress();
     }
   }
@@ -81,11 +96,22 @@ class FormAnalyzer {
   void _emitProgress() {
     if (_progressController == null || _progressController!.isClosed) return;
 
+    final vertOsc = _calculator.calculateVerticalOscillationCm();
+    final hipDrop = _calculator.calculateHipDropDegrees();
+    final armSym = _calculator.calculateArmSwingSymmetry();
+    final footStrike = _calculator.detectFootStrike();
+
     _progressController!.add(FormAnalysisProgress(
       formScore: _calculator.calculateFormScore(),
       cadence: _calculator.calculateCadence(),
       groundContactTimeMs: _calculator.calculateGroundContactTimeMs(),
+      verticalOscillationCm: vertOsc,
+      forwardLeanDeg: _calculator.calculateForwardLeanDegrees(),
+      hipDropDeg: hipDrop,
+      armSwingSymmetryPct: armSym * 100,
+      footStrikeType: _mapFootStrike(footStrike),
       framesProcessed: _frameCount,
+      sessionDurationSec: sessionDurationSec,
     ));
   }
 
@@ -113,12 +139,18 @@ class FormAnalyzer {
     final formScore = _calculator.calculateFormScore();
     final tips = _calculator.generateCoachingTips();
 
-    // Calculate stride length from cadence and assumed speed
-    // This is a rough estimate — real stride length needs distance data
+    // Calculate stride length from cadence and estimated speed
+    // Use session duration and assumed GPS pace if available
     double strideLengthM = 0;
     if (cadence > 0) {
-      // Assume ~5:00/km pace → 12 km/h → 200 m/min
-      strideLengthM = 200 / cadence; // meters per step
+      // Better estimation: use form score to estimate speed range
+      // Elite runners: ~15 km/h, recreational: ~10 km/h
+      final estimatedSpeedMPerMin = formScore >= 75
+          ? 230.0   // ~13.8 km/h
+          : formScore >= 50
+              ? 185.0 // ~11.1 km/h
+              : 150.0; // ~9.0 km/h
+      strideLengthM = estimatedSpeedMPerMin / cadence;
     }
 
     final result = FormAnalysisResult(
@@ -139,8 +171,11 @@ class FormAnalyzer {
     );
 
     _calculator.reset();
+    _sessionStartTime = null;
+
     debugPrint('FormAnalyzer: Session complete — score: $formScore, '
-        '$_frameCount frames analyzed');
+        '$_frameCount frames analyzed, '
+        'GCT: ${gct.toStringAsFixed(0)}ms, Cadence: $cadence spm');
 
     return result;
   }
@@ -164,12 +199,24 @@ class FormAnalysisProgress {
   final int formScore;
   final int cadence;
   final double groundContactTimeMs;
+  final double verticalOscillationCm;
+  final double forwardLeanDeg;
+  final double hipDropDeg;
+  final double armSwingSymmetryPct;
+  final String footStrikeType;
   final int framesProcessed;
+  final int sessionDurationSec;
 
   const FormAnalysisProgress({
     required this.formScore,
     required this.cadence,
     required this.groundContactTimeMs,
+    this.verticalOscillationCm = 0,
+    this.forwardLeanDeg = 0,
+    this.hipDropDeg = 0,
+    this.armSwingSymmetryPct = 0,
+    this.footStrikeType = 'midfoot',
     required this.framesProcessed,
+    this.sessionDurationSec = 0,
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'form_analyzer.dart';
 import 'hrv_service.dart';
@@ -14,7 +15,11 @@ import 'models/hrv_data.dart';
 
 /// Provides the FormAnalyzer for running form analysis sessions
 final formAnalyzerProvider = Provider<FormAnalyzer>((ref) {
-  return FormAnalyzer();
+  final analyzer = FormAnalyzer();
+  // Inject ML service for post-analysis predictions
+  final mlService = ref.watch(tfliteServiceProvider);
+  analyzer.mlService = mlService;
+  return analyzer;
 });
 
 /// Provides the PoseCameraService for camera → pose detection pipeline
@@ -45,33 +50,42 @@ final formAnalysisStateProvider =
     StateNotifierProvider<FormAnalysisNotifier, FormAnalysisState>((ref) {
   final analyzer = ref.watch(formAnalyzerProvider);
   final cameraService = ref.watch(poseCameraServiceProvider);
-  return FormAnalysisNotifier(analyzer, cameraService);
+  final mlService = ref.watch(tfliteServiceProvider);
+  return FormAnalysisNotifier(analyzer, cameraService, mlService);
 });
 
 class FormAnalysisState {
   final bool isAnalyzing;
   final FormAnalysisResult? lastResult;
   final FormAnalysisProgress? liveProgress;
+  final FormAnalysisPrediction? mlPrediction;
   final String? errorMessage;
+  final bool isLoadingPrediction;
 
   const FormAnalysisState({
     this.isAnalyzing = false,
     this.lastResult,
     this.liveProgress,
+    this.mlPrediction,
     this.errorMessage,
+    this.isLoadingPrediction = false,
   });
 
   FormAnalysisState copyWith({
     bool? isAnalyzing,
     FormAnalysisResult? lastResult,
     FormAnalysisProgress? liveProgress,
+    FormAnalysisPrediction? mlPrediction,
     String? errorMessage,
+    bool? isLoadingPrediction,
   }) {
     return FormAnalysisState(
       isAnalyzing: isAnalyzing ?? this.isAnalyzing,
       lastResult: lastResult ?? this.lastResult,
       liveProgress: liveProgress ?? this.liveProgress,
+      mlPrediction: mlPrediction ?? this.mlPrediction,
       errorMessage: errorMessage,
+      isLoadingPrediction: isLoadingPrediction ?? this.isLoadingPrediction,
     );
   }
 }
@@ -79,10 +93,11 @@ class FormAnalysisState {
 class FormAnalysisNotifier extends StateNotifier<FormAnalysisState> {
   final FormAnalyzer _analyzer;
   final PoseCameraService _cameraService;
+  final TFLiteModelService _mlService;
   StreamSubscription<PoseFrame>? _poseSubscription;
   StreamSubscription<FormAnalysisProgress>? _progressSubscription;
 
-  FormAnalysisNotifier(this._analyzer, this._cameraService)
+  FormAnalysisNotifier(this._analyzer, this._cameraService, this._mlService)
       : super(const FormAnalysisState());
 
   /// Start a form analysis session — opens camera, starts pose detection,
@@ -91,7 +106,11 @@ class FormAnalysisNotifier extends StateNotifier<FormAnalysisState> {
     try {
       // Start the form analyzer
       _analyzer.start();
-      state = state.copyWith(isAnalyzing: true, errorMessage: null);
+      state = state.copyWith(
+        isAnalyzing: true,
+        errorMessage: null,
+        mlPrediction: null,
+      );
 
       // Listen to progress updates from the analyzer
       _progressSubscription = _analyzer.progressStream?.listen((progress) {
@@ -137,7 +156,31 @@ class FormAnalysisNotifier extends StateNotifier<FormAnalysisState> {
       isAnalyzing: false,
       lastResult: result,
       liveProgress: null,
+      isLoadingPrediction: result != null,
     );
+
+    // Run ML predictions on the result
+    if (result != null) {
+      _runMLPrediction(result);
+    }
+  }
+
+  /// Run gait form + injury risk predictions after analysis completes
+  Future<void> _runMLPrediction(FormAnalysisResult result) async {
+    try {
+      final prediction = await _mlService.analyzeFormResult(result);
+      if (mounted) {
+        state = state.copyWith(
+          mlPrediction: prediction,
+          isLoadingPrediction: false,
+        );
+      }
+    } catch (e) {
+      debugPrint('ML prediction failed: $e');
+      if (mounted) {
+        state = state.copyWith(isLoadingPrediction: false);
+      }
+    }
   }
 
   /// Feed a pose frame from camera/MediaPipe detection
@@ -192,7 +235,7 @@ final tfliteServiceProvider = Provider<TFLiteModelService>((ref) {
   final service = TFLiteModelService();
   // Initialize asynchronously — service degrades gracefully if server unreachable
   service.initialize().then((_) {
-    debugPrint('TFLiteModelService: ready');
+    debugPrint('TFLiteModelService: ready (server=${service.isServerAvailable})');
   }).catchError((e) {
     debugPrint('TFLiteModelService: init failed (fallback active): $e');
   });

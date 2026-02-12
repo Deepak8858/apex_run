@@ -159,18 +159,18 @@ class _CoachHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.electricLime.withOpacity(0.08),
+            AppTheme.electricLime.withValues(alpha: 0.08),
             AppTheme.cardBackground,
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: AppTheme.electricLime.withOpacity(0.1),
+          color: AppTheme.electricLime.withValues(alpha: 0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -189,7 +189,7 @@ class _CoachHeader extends StatelessWidget {
                   color: AppTheme.electricLime,
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.electricLime.withOpacity(0.3),
+                      color: AppTheme.electricLime.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -218,7 +218,7 @@ class _CoachHeader extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppTheme.electricLime.withOpacity(0.1),
+                        color: AppTheme.electricLime.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -276,7 +276,7 @@ class _CoachHeader extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: AppTheme.textTertiary.withOpacity(0.3),
+                        color: AppTheme.textTertiary.withValues(alpha: 0.3),
                       ),
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -312,7 +312,7 @@ class _DetailedWorkoutCard extends StatelessWidget {
         border: Border.all(color: AppTheme.surfaceLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -349,10 +349,10 @@ class _DetailedWorkoutCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppTheme.electricLime.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppTheme.electricLime.withOpacity(0.2),
+                        color: AppTheme.electricLime.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: AppTheme.electricLime.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Text(
@@ -466,7 +466,7 @@ class _InteractiveStatBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceLight.withOpacity(0.5),
+        color: AppTheme.surfaceLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppTheme.surfaceLight),
       ),
@@ -500,7 +500,7 @@ class _CompactWorkoutCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -552,7 +552,7 @@ class _CompactWorkoutCard extends StatelessWidget {
                 ),
                 Icon(
                   Icons.chevron_right_rounded,
-                  color: AppTheme.textTertiary.withOpacity(0.5),
+                  color: AppTheme.textTertiary.withValues(alpha: 0.5),
                 ),
               ],
             ),
@@ -632,9 +632,9 @@ class _InsightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.info.withOpacity(0.08),
+        color: AppTheme.info.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.info.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.info.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -671,9 +671,9 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.error.withOpacity(0.1),
+        color: AppTheme.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
