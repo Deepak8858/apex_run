@@ -190,7 +190,12 @@ final hrvTrendProvider = Provider<double?>((ref) {
 /// Provides the TFLite model service for on-device/server ML inference
 final tfliteServiceProvider = Provider<TFLiteModelService>((ref) {
   final service = TFLiteModelService();
-  service.initialize();
+  // Initialize asynchronously — service degrades gracefully if server unreachable
+  service.initialize().then((_) {
+    debugPrint('TFLiteModelService: ready');
+  }).catchError((e) {
+    debugPrint('TFLiteModelService: init failed (fallback active): $e');
+  });
   return service;
 });
 

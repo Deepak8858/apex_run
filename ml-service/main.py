@@ -385,6 +385,12 @@ async def build_tflite_models():
         from tflite_builder import build_all_models
         results = build_all_models(epochs=50)
         return BuildModelsResponse(status="success", models=results)
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="TensorFlow not installed. Model building requires the full tensorflow package. "
+                   "The rule-based inference endpoints (/gait/injury-risk, /performance/forecast, /training/load) work without it."
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Model build failed: {str(e)}")
 
@@ -438,17 +444,23 @@ async def tflite_inference(request: TFLiteInferenceRequest):
         input_data = np.array(request.features, dtype=np.float32)
         output = run_tflite_inference(str(model_path), input_data)
         prediction = output.flatten().tolist()
-
-        # Interpret results
-        interpretation = _interpret_prediction(request.model, prediction, request.features)
-
-        return TFLiteInferenceResponse(
-            model=request.model,
-            prediction=prediction,
-            interpretation=interpretation,
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="TFLite runtime not installed. Use the rule-based endpoints instead: "
+                   "/api/v1/gait/injury-risk, /api/v1/performance/forecast, /api/v1/training/load"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
+
+    # Interpret results
+    interpretation = _interpret_prediction(request.model, prediction, request.features)
+
+    return TFLiteInferenceResponse(
+        model=request.model,
+        prediction=prediction,
+        interpretation=interpretation,
+    )
 
 
 def _interpret_prediction(model_name: str, prediction: List[float], features: List[float]) -> dict:

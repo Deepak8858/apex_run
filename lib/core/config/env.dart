@@ -39,7 +39,7 @@ class Env {
   // ── ML Service Configuration ────────────────────────────────────────
   static const String mlServiceUrl = String.fromEnvironment(
     'ML_SERVICE_URL',
-    defaultValue: 'http://localhost:8001',
+    defaultValue: 'https://api.devdeepak.me',
   );
 
   // ── Google Cloud / Gemini Configuration ─────────────────────────────
