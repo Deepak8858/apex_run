@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -62,36 +63,71 @@ class AuthDataSource {
     }
   }
 
-  /// Sign in with Google (OAuth flow via Supabase)
+  /// Sign in with Google (native flow via google_sign_in + Supabase ID Token)
   ///
-  /// Uses Supabase's OAuth flow which handles the entire authentication
-  /// process through the browser. This works without requiring Firebase
-  /// configuration or google-services.json.
+  /// Uses native Google Sign-In for a seamless experience, then exchanges
+  /// the ID token with Supabase for a session. Falls back to OAuth browser
+  /// flow if native sign-in is unavailable.
   Future<AuthResponse> signInWithGoogle() async {
     try {
-      print('🔐 Starting Google OAuth sign-in...');
+      print('🔐 Starting native Google Sign-In...');
       
-      final success = await _supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'apexrun://login-callback',
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      // Use the web client ID from Google Cloud Console for Supabase
+      // This must match the client ID configured in Supabase Auth > Google provider
+      const webClientId = '816058498934-9v7gdfr5r4fhhq6dn3e5a8nk72l1rqtq.apps.googleusercontent.com';
+      
+      final googleSignIn = GoogleSignIn(
+        serverClientId: webClientId,
       );
       
-      if (!success) {
-        throw const AuthException('Failed to launch Google sign-in');
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        throw const AuthException('Google sign-in was cancelled');
       }
       
-      print('✅ Google OAuth browser launched successfully');
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
       
-      // For OAuth flow, we need to wait for the callback
-      // The actual auth happens via the redirect
-      return AuthResponse(
-        session: null,
-        user: null,
+      if (idToken == null) {
+        throw const AuthException('Failed to get Google ID token');
+      }
+      
+      print('✅ Google native sign-in successful, exchanging with Supabase...');
+      
+      // Exchange the Google ID token with Supabase
+      final response = await _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
       );
-    } catch (e) {
-      print('❌ Google OAuth failed: $e');
+      
+      print('✅ Supabase session created for: ${response.user?.email}');
+      return response;
+    } on AuthException {
       rethrow;
+    } catch (e) {
+      print('⚠️ Native Google Sign-In failed: $e');
+      print('📱 Falling back to OAuth browser flow...');
+      
+      // Fallback to Supabase OAuth browser flow
+      try {
+        final success = await _supabase.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'apexrun://login-callback',
+          authScreenLaunchMode: LaunchMode.externalApplication,
+        );
+        
+        if (!success) {
+          throw const AuthException('Failed to launch Google sign-in');
+        }
+        
+        print('✅ Google OAuth browser launched');
+        return AuthResponse(session: null, user: null);
+      } catch (fallbackError) {
+        print('❌ Fallback OAuth also failed: $fallbackError');
+        throw AuthException('Google sign-in failed: $e');
+      }
     }
   }
 

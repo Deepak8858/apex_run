@@ -72,12 +72,15 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> signInWithGoogle() async {
     try {
-      // OAuth flow launches browser and returns immediately
-      // The actual session is established via the redirect callback
-      // and will be picked up by the auth state listener
-      await _dataSource.signInWithGoogle();
+      // Native Google Sign-In returns a complete session directly
+      final response = await _dataSource.signInWithGoogle();
       
-      // Wait for auth state change with timeout
+      if (response.user != null) {
+        // Native flow succeeded — user is available immediately
+        return response.user!;
+      }
+      
+      // Browser OAuth fallback — wait for auth state change
       final user = await _dataSource.authStateChanges
           .where((state) => state.session != null)
           .map((state) => state.session?.user)

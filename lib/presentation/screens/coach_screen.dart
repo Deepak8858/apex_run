@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/planned_workout.dart';
 import '../providers/app_providers.dart';
+import 'form_analysis_screen.dart';
 
 /// AI Coach Screen - Gemini-powered Training Plans
 ///
@@ -48,6 +49,17 @@ class CoachScreen extends ConsumerWidget {
                 onInsight: () => ref
                     .read(coachControllerProvider.notifier)
                     .getCoachingInsight(),
+              ),
+              const SizedBox(height: 16),
+
+              // Form Analysis Quick Action
+              _FormAnalysisEntryCard(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FormAnalysisScreen(),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -506,7 +518,7 @@ class _CompactWorkoutCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {}, // Just visual for now
+          onTap: () => _showWorkoutDetail(context, workout),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
             child: Row(
@@ -565,7 +577,240 @@ class _CompactWorkoutCard extends StatelessWidget {
   IconData _getIconForType(String type) {
     if (type.contains('run')) return Icons.directions_run;
     if (type.contains('rest')) return Icons.hotel;
+    if (type.contains('easy')) return Icons.self_improvement_rounded;
+    if (type.contains('tempo')) return Icons.speed_rounded;
+    if (type.contains('interval')) return Icons.flash_on_rounded;
+    if (type.contains('recovery')) return Icons.healing_rounded;
+    if (type.contains('race')) return Icons.emoji_events_rounded;
     return Icons.fitness_center;
+  }
+
+  Color _getColorForType(String type) {
+    if (type.contains('easy')) return AppTheme.success;
+    if (type.contains('tempo')) return AppTheme.warning;
+    if (type.contains('interval')) return AppTheme.heartRate;
+    if (type.contains('long')) return AppTheme.distance;
+    if (type.contains('recovery')) return AppTheme.info;
+    if (type.contains('race')) return AppTheme.electricLime;
+    return AppTheme.textSecondary;
+  }
+
+  void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
+    final color = _getColorForType(workout.workoutType);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        builder: (_, controller) => Container(
+          decoration: const BoxDecoration(
+            color: AppTheme.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(24),
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Type badge
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: color.withValues(alpha: 0.2)),
+                    ),
+                    child: Icon(_getIconForType(workout.workoutType),
+                        color: color, size: 28),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _formatWorkoutTitle(workout.workoutType),
+                          style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatDate(workout.plannedDate),
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (workout.isCompleted)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded,
+                              color: AppTheme.success, size: 16),
+                          SizedBox(width: 4),
+                          Text('Done',
+                              style: TextStyle(
+                                  color: AppTheme.success,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Description
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.surfaceLight),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Description',
+                        style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 8),
+                    Text(
+                      workout.description,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Stats row
+              Row(
+                children: [
+                  if (workout.targetDistanceMeters != null)
+                    Expanded(
+                      child: _DetailStatBox(
+                        icon: Icons.straighten_rounded,
+                        label: 'Distance',
+                        value: workout.formattedTargetDistance ?? '',
+                        color: AppTheme.distance,
+                      ),
+                    ),
+                  if (workout.targetDistanceMeters != null &&
+                      workout.targetDurationMinutes != null)
+                    const SizedBox(width: 12),
+                  if (workout.targetDurationMinutes != null)
+                    Expanded(
+                      child: _DetailStatBox(
+                        icon: Icons.timer_outlined,
+                        label: 'Duration',
+                        value: workout.formattedTargetDuration ?? '',
+                        color: AppTheme.warning,
+                      ),
+                    ),
+                ],
+              ),
+              // Coaching Rationale
+              if (workout.coachingRationale != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.electricLime.withValues(alpha: 0.08),
+                        AppTheme.electricLime.withValues(alpha: 0.02),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppTheme.electricLime.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.psychology_alt_rounded,
+                              size: 18, color: AppTheme.electricLime),
+                          SizedBox(width: 8),
+                          Text('Coach\'s Rationale',
+                              style: TextStyle(
+                                  color: AppTheme.electricLime,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        workout.coachingRationale!,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 14,
+                          height: 1.5,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              // Close button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textSecondary,
+                    side: const BorderSide(color: AppTheme.surfaceLight),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
   
   String _formatWorkoutTitle(String type) {
@@ -728,6 +973,135 @@ class _LoadingCard extends StatelessWidget {
             strokeWidth: 2,
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Form Analysis Entry Card
+// ============================================================
+
+class _FormAnalysisEntryCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _FormAnalysisEntryCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.info.withValues(alpha: 0.10),
+                AppTheme.info.withValues(alpha: 0.03),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.info.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.camera_alt_rounded,
+                    color: AppTheme.info, size: 26),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Running Form Analysis',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Use camera + AI to analyze your running form',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.arrow_forward_rounded,
+                    color: AppTheme.info, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Detail Stat Box (for workout detail bottom sheet)
+// ============================================================
+
+class _DetailStatBox extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DetailStatBox({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 8),
+          Text(label,
+              style: TextStyle(
+                  color: color.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5)),
+          const SizedBox(height: 4),
+          Text(value,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold)),
+        ],
       ),
     );
   }

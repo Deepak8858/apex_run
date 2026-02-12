@@ -416,8 +416,9 @@ class GaitMetricsCalculator {
 
     final gct = calculateGroundContactTimeMs();
     if (gct > 0) {
-      if (gct < 200) score += 18;
-      else if (gct < 230) score += 14;
+      if (gct < 200) {
+        score += 18;
+      } else if (gct < 230) score += 14;
       else if (gct < 260) score += 10;
       else if (gct < 300) score += 5;
       else score += 2;
@@ -425,26 +426,30 @@ class GaitMetricsCalculator {
 
     final cadence = calculateCadence();
     if (cadence > 0) {
-      if (cadence >= 175 && cadence <= 190) score += 18;
-      else if (cadence >= 170) score += 14;
+      if (cadence >= 175 && cadence <= 190) {
+        score += 18;
+      } else if (cadence >= 170) score += 14;
       else if (cadence >= 165) score += 10;
       else if (cadence >= 160) score += 5;
       else score += 2;
     }
 
     final lean = calculateForwardLeanDegrees();
-    if (lean >= 5 && lean <= 10) score += 8;
-    else if (lean >= 3 && lean <= 15) score += 5;
+    if (lean >= 5 && lean <= 10) {
+      score += 8;
+    } else if (lean >= 3 && lean <= 15) score += 5;
     else if (lean > 0) score += 2;
 
     final hipDrop = calculateHipDropDegrees();
-    if (hipDrop < 4) score += 8;
-    else if (hipDrop < 6) score += 5;
+    if (hipDrop < 4) {
+      score += 8;
+    } else if (hipDrop < 6) score += 5;
     else if (hipDrop < 8) score += 3;
 
     final armSym = calculateArmSwingSymmetry();
-    if (armSym >= 0.9) score += 8;
-    else if (armSym >= 0.8) score += 5;
+    if (armSym >= 0.9) {
+      score += 8;
+    } else if (armSym >= 0.8) score += 5;
     else if (armSym >= 0.7) score += 3;
 
     return score.clamp(0, 100);

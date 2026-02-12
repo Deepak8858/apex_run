@@ -6,6 +6,10 @@
 -keep class io.flutter.** { *; }
 -keep class io.flutter.plugins.** { *; }
 
+# Google Play Core (deferred components)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
 # Mapbox
 -keep class com.mapbox.** { *; }
 -dontwarn com.mapbox.**
@@ -25,3 +29,13 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Health plugin
+-keep class cachet.plugins.health.** { *; }
+-dontwarn cachet.plugins.health.**
+
+# Google Fit / Health Connect
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+-keep class androidx.health.connect.** { *; }
+-dontwarn androidx.health.connect.**
