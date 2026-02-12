@@ -9,7 +9,7 @@ set -e
 #   2. DNS propagation complete (check: dig api.apexrun.app)
 #   3. Backend already running on port 8080
 
-DOMAIN="api.apexrun.app"
+DOMAIN="api.devdeepak.me"
 EMAIL="deepak8858@gmail.com"
 PROJECT_DIR="/root/apex_run"
 COMPOSE_FILE="docker-compose.prod.yml"
