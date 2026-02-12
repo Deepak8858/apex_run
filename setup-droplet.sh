@@ -68,6 +68,10 @@ fi
 echo ""
 echo "📝 Creating environment configuration..."
 if [ ! -f "./backend/.env" ]; then
+    # Copies the production environment configuration file to the default environment file
+    # for the backend application. This assumes the backend directory exists in the current
+    # working directory and is typically run during deployment/setup on Ubuntu or similar Unix-like systems.
+    # Note: Ensure ./backend/.env.production exists before running this command.
     cp ./backend/.env.production ./backend/.env
     echo "⚠️  IMPORTANT: Edit backend/.env with your actual credentials:"
     echo "   nano backend/.env"
