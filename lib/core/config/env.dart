@@ -33,7 +33,7 @@ class Env {
   // ── Backend API Configuration ───────────────────────────────────────
   static const String backendApiUrl = String.fromEnvironment(
     'BACKEND_API_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://dns1.devdeepak.me',
   );
 
   // ── ML Service Configuration ────────────────────────────────────────
