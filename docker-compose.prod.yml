@@ -59,7 +59,7 @@ networks:
     enable_ipv6: true
     ipam:
       config:
-        - subnet: "fd00:db8:1::/64"
+        - subnet: "fd00:db8:2::/64"
 
 volumes:
   ssl_certs:
