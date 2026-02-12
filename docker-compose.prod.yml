@@ -56,6 +56,10 @@ services:
 networks:
   apexrun_network:
     driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: "fd00:db8:1::/64"
 
 volumes:
   ssl_certs:

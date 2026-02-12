@@ -21,6 +21,19 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docke
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
+# Enable IPv6 in Docker daemon (required for Supabase direct connection)
+echo "🌐 Enabling IPv6 in Docker..."
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json << 'EOF'
+{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00:db8:1::/64",
+  "experimental": true,
+  "ip6tables": true
+}
+EOF
+systemctl restart docker
+
 # Install Docker Compose standalone
 echo "📝 Installing Docker Compose..."
 curl -L "https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -47,7 +60,7 @@ if [ -d "apex_run" ]; then
     cd apex_run
     git pull origin main
 else
-    git clone https://github.com/YOUR_USERNAME/apex_run.git
+    git clone https://github.com/Deepak8858/apex_run.git
     cd apex_run
 fi
 

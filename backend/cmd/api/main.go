@@ -58,19 +58,14 @@ func main() {
 		zap.Int("db_url_len", len(cfg.DatabaseURL)),
 		zap.Bool("db_url_empty", cfg.DatabaseURL == ""),
 	)
-	db, err := database.New(
+	db := database.New(
 		cfg.DatabaseURL,
 		cfg.DBMaxOpenConns,
 		cfg.DBMaxIdleConns,
 		cfg.DBConnMaxLifetime,
 		log,
 	)
-	if err != nil {
-		log.Error("database connection setup failed", zap.Error(err))
-	}
-	if db != nil {
-		defer db.Close()
-	}
+	defer db.Close()
 
 	// ----------------------------------------------------------------
 	// 4. Connect to Redis (graceful degradation if unavailable)
@@ -90,11 +85,16 @@ func main() {
 	}
 
 	// ----------------------------------------------------------------
-	// 5. Build repositories
+	// 5. Build repositories (pool may be nil if DATABASE_URL is empty/invalid)
 	// ----------------------------------------------------------------
-	activityRepo := activities.NewRepository(db.Pool, log)
-	segmentRepo := segments.NewRepository(db.Pool, log)
-	coachingRepo := coaching.NewRepository(db.Pool, log)
+	dbPool := db.GetPool()
+	if dbPool == nil {
+		log.Error("database pool is nil — API endpoints requiring DB will return errors. " +
+			"Set a valid DATABASE_URL environment variable.")
+	}
+	activityRepo := activities.NewRepository(dbPool, log)
+	segmentRepo := segments.NewRepository(dbPool, log)
+	coachingRepo := coaching.NewRepository(dbPool, log)
 
 	// ----------------------------------------------------------------
 	// 6. Build handlers
@@ -271,17 +271,26 @@ func healthHandler(db *database.DB, rds *database.Redis) gin.HandlerFunc {
 		defer cancel()
 
 		dbStatus := "not_configured"
+		dbConnType := "none"
+		dbLastError := ""
 		if db != nil {
-			dbStatus = "connected"
-			if err := db.HealthCheck(ctx); err != nil {
-				dbStatus = "error: " + err.Error()
+			dbConnType = db.ConnType()
+			if db.GetPool() != nil {
+				dbStatus = "connected"
+				if err := db.HealthCheck(ctx); err != nil {
+					dbStatus = "error"
+					dbLastError = err.Error()
+				}
+			} else {
+				dbStatus = "no_pool"
+				dbLastError = db.LastError()
 			}
 		}
 
 		redisStatus := "disabled"
 		if rds != nil {
 			if err := rds.HealthCheck(ctx); err != nil {
-				redisStatus = "error: " + err.Error()
+				redisStatus = "error"
 			} else {
 				redisStatus = "connected"
 			}
@@ -294,11 +303,17 @@ func healthHandler(db *database.DB, rds *database.Redis) gin.HandlerFunc {
 			overallStatus = "degraded"
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"status":   overallStatus,
-			"version":  version,
-			"database": dbStatus,
-			"redis":    redisStatus,
-		})
+		response := gin.H{
+			"status":       overallStatus,
+			"version":      version,
+			"database":     dbStatus,
+			"db_conn_type": dbConnType,
+			"redis":        redisStatus,
+		}
+		if dbLastError != "" {
+			response["db_error"] = dbLastError
+		}
+
+		c.JSON(http.StatusOK, response)
 	}
 }
