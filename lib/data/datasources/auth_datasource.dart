@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/config/env.dart';
 
 /// Authentication Data Source using Supabase
 ///
@@ -63,72 +67,113 @@ class AuthDataSource {
     }
   }
 
-  /// Sign in with Google (native flow via google_sign_in + Supabase ID Token)
+  /// Sign in with Google — native in-app flow with browser fallback
   ///
-  /// Uses native Google Sign-In for a seamless experience, then exchanges
-  /// the ID token with Supabase for a session. Falls back to OAuth browser
-  /// flow if native sign-in is unavailable.
+  /// Primary: Uses GoogleSignIn package for native in-app sign-in,
+  /// then exchanges the ID token with Supabase via signInWithIdToken.
+  /// Fallback: If native flow fails, falls back to browser OAuth.
   Future<AuthResponse> signInWithGoogle() async {
     try {
-      print('🔐 Starting native Google Sign-In...');
-      
-      // Use the web client ID from Google Cloud Console for Supabase
-      // This must match the client ID configured in Supabase Auth > Google provider
-      const webClientId = '816058498934-9v7gdfr5r4fhhq6dn3e5a8nk72l1rqtq.apps.googleusercontent.com';
-      
-      final googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-      );
-      
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        throw const AuthException('Google sign-in was cancelled');
-      }
-      
-      final googleAuth = await googleUser.authentication;
-      final idToken = googleAuth.idToken;
-      final accessToken = googleAuth.accessToken;
-      
-      if (idToken == null) {
-        throw const AuthException('Failed to get Google ID token');
-      }
-      
-      print('✅ Google native sign-in successful, exchanging with Supabase...');
-      
-      // Exchange the Google ID token with Supabase
-      final response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: idToken,
-        accessToken: accessToken,
-      );
-      
-      print('✅ Supabase session created for: ${response.user?.email}');
-      return response;
-    } on AuthException {
-      rethrow;
-    } catch (e) {
-      print('⚠️ Native Google Sign-In failed: $e');
-      print('📱 Falling back to OAuth browser flow...');
-      
-      // Fallback to Supabase OAuth browser flow
+      print('🔐 Attempting native Google Sign-In...');
+
+      // Try native Google Sign-In first
       try {
-        final success = await _supabase.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: 'apexrun://login-callback',
-          authScreenLaunchMode: LaunchMode.externalApplication,
-        );
-        
-        if (!success) {
-          throw const AuthException('Failed to launch Google sign-in');
+        final response = await _nativeGoogleSignIn();
+        if (response.session != null) {
+          print('✅ Native Google Sign-In successful!');
+          // Ensure profile exists for the new Google user
+          await _ensureProfileExists(response.user);
+          return response;
         }
-        
-        print('✅ Google OAuth browser launched');
-        return AuthResponse(session: null, user: null);
-      } catch (fallbackError) {
-        print('❌ Fallback OAuth also failed: $fallbackError');
-        throw AuthException('Google sign-in failed: $e');
+      } on PlatformException catch (e) {
+        print('⚠️ Native Google Sign-In unavailable: ${e.message}');
+        print('↪️ Falling back to browser OAuth...');
+      } on AuthException catch (e) {
+        // If it's a user cancellation, don't fall back to browser
+        if (e.message.contains('cancelled')) {
+          rethrow;
+        }
+        print('⚠️ Native Google Sign-In auth error: ${e.message}');
+        print('↪️ Falling back to browser OAuth...');
+      } catch (e) {
+        print('⚠️ Native Google Sign-In failed: $e');
+        print('↪️ Falling back to browser OAuth...');
       }
+
+      // Fallback: browser-based OAuth
+      return await _browserGoogleSignIn();
+    } catch (e) {
+      print('❌ Google sign-in failed: $e');
+      rethrow;
     }
+  }
+
+  /// Native in-app Google Sign-In using google_sign_in package
+  Future<AuthResponse> _nativeGoogleSignIn() async {
+    // Configure GoogleSignIn — uses Web Client ID for Supabase token exchange
+    // On iOS, clientId is required (iOS OAuth Client ID or Web Client ID)
+    // On Android, serverClientId is used to request the ID token
+    final isIos = defaultTargetPlatform == TargetPlatform.iOS;
+
+    final googleSignIn = GoogleSignIn(
+      // iOS needs clientId; use iOS client ID if available, fall back to Web Client ID
+      clientId: isIos
+          ? (Env.googleIosClientId.isNotEmpty
+              ? Env.googleIosClientId
+              : (Env.googleWebClientId.isNotEmpty
+                  ? Env.googleWebClientId
+                  : null))
+          : null,
+      // serverClientId is for Android to get an ID token for backend exchange
+      serverClientId: Env.googleWebClientId.isNotEmpty
+          ? Env.googleWebClientId
+          : null,
+      scopes: ['email', 'profile'],
+    );
+
+    // Sign out first to force account picker
+    await googleSignIn.signOut();
+
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      throw const AuthException('Google sign-in was cancelled by user');
+    }
+
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken == null) {
+      throw const AuthException('Failed to get Google ID token');
+    }
+
+    // Exchange the Google ID token with Supabase
+    final response = await _supabase.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: idToken,
+      accessToken: accessToken,
+    );
+
+    return response;
+  }
+
+  /// Browser-based Google OAuth (fallback)
+  Future<AuthResponse> _browserGoogleSignIn() async {
+    print('🔐 Starting Google OAuth browser flow...');
+
+    final success = await _supabase.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'apexrun://login-callback',
+      authScreenLaunchMode: LaunchMode.externalApplication,
+    );
+
+    if (!success) {
+      throw const AuthException('Failed to launch Google sign-in');
+    }
+
+    print('✅ Google OAuth browser launched – waiting for redirect...');
+    // Return empty response; session arrives via deep link
+    return AuthResponse(session: null, user: null);
   }
 
   /// Sign in with Apple (native flow)
@@ -230,4 +275,32 @@ class AuthDataSource {
 
   /// Check if user is authenticated
   bool get isAuthenticated => currentSession != null && currentUser != null;
+
+  /// Ensure a user profile exists after OAuth sign-in.
+  /// For Google/Apple sign-ins, Supabase creates the auth.users row
+  /// but the public.user_profiles row might not exist yet.
+  Future<void> _ensureProfileExists(User? user) async {
+    if (user == null) return;
+    try {
+      final existing = await _supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (existing == null) {
+        final meta = user.userMetadata;
+        await _supabase.from('user_profiles').insert({
+          'id': user.id,
+          'display_name': meta?['full_name'] ?? meta?['name'] ?? user.email?.split('@').first ?? 'Runner',
+          'avatar_url': meta?['avatar_url'] ?? meta?['picture'],
+          'profile_completed': false,
+        });
+        print('📋 Created user profile for Google user: ${user.id}');
+      }
+    } catch (e) {
+      // Non-fatal — profile can be created later during onboarding
+      print('⚠️ Could not auto-create profile: $e');
+    }
+  }
 }

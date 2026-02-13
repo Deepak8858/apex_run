@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/datasources/segment_datasource.dart';
 import '../../domain/models/segment.dart';
 import '../../domain/models/segment_effort.dart';
 import '../providers/app_providers.dart';
@@ -114,31 +115,51 @@ class _SegmentErrorView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Extract user-friendly message from SegmentException
+    final isSegmentError = error is SegmentException;
+    final userMessage = isSegmentError
+        ? (error as SegmentException).userMessage
+        : 'Could not load segments. Please try again.';
+    final isRetryable = isSegmentError
+        ? (error as SegmentException).isRetryable
+        : true;
+    final icon = isSegmentError &&
+            (error as SegmentException)
+                .message
+                .contains('Auth')
+        ? Icons.lock_outline_rounded
+        : isSegmentError &&
+                (error as SegmentException)
+                    .message
+                    .contains('Network')
+            ? Icons.wifi_off_rounded
+            : Icons.cloud_off_rounded;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 64, color: AppTheme.textTertiary),
+            Icon(icon, size: 64, color: AppTheme.textTertiary),
             const SizedBox(height: 16),
-            Text('Could not load segments',
+            Text('Segments Unavailable',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             Text(
-              'The segment server may be offline. Make sure the Go backend is running and you are signed in.',
+              userMessage,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondary,
                   ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(segmentsProvider),
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: const Text('Retry'),
-            ),
+            if (isRetryable)
+              ElevatedButton.icon(
+                onPressed: () => ref.invalidate(segmentsProvider),
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text('Retry'),
+              ),
           ],
         ),
       ),

@@ -77,43 +77,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final authNotifier = ref.read(authStateProvider.notifier);
-      
-      // Show browser launching message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Opening $provider sign-in in browser...'),
-            backgroundColor: AppTheme.electricLime.withAlpha(200),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-      
+
       if (provider == 'google') {
         await authNotifier.signInWithGoogle();
       } else if (provider == 'apple') {
         await authNotifier.signInWithApple();
       }
-      
-      // Success - user will be redirected back to app
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Complete sign-in in your browser, then return to the app'),
-            backgroundColor: AppTheme.success,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$provider sign-in failed: ${e.toString()}'),
-            backgroundColor: AppTheme.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        final errorMsg = e.toString();
+        // Don't show error if user cancelled
+        if (!errorMsg.contains('cancelled')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign-in failed. Please try again.'),
+              backgroundColor: AppTheme.error,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {

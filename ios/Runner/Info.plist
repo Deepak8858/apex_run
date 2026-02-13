@@ -51,10 +51,21 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.example.apex_run</string>
+			<string>com.apexrun.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>apexrun</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>google-sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- Reversed Web Client ID for Google Sign-In -->
+				<string>com.googleusercontent.apps.8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4</string>
 			</array>
 		</dict>
 	</array>

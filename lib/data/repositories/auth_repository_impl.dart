@@ -72,23 +72,22 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> signInWithGoogle() async {
     try {
-      // Native Google Sign-In returns a complete session directly
       final response = await _dataSource.signInWithGoogle();
-      
+
+      // If native flow succeeded, we have the user directly
       if (response.user != null) {
-        // Native flow succeeded — user is available immediately
         return response.user!;
       }
-      
-      // Browser OAuth fallback — wait for auth state change
+
+      // Browser fallback: wait for auth state change from deep-link redirect
       final user = await _dataSource.authStateChanges
           .where((state) => state.session != null)
           .map((state) => state.session?.user)
           .firstWhere((user) => user != null)
           .timeout(
-            const Duration(seconds: 60),
+            const Duration(seconds: 120),
             onTimeout: () => throw Exception(
-              'Google sign-in timed out. Please try again.',
+              'Google sign-in timed out. Please complete sign-in in your browser and return to the app.',
             ),
           );
 

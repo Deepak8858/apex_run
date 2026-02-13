@@ -48,8 +48,20 @@ class DioClient {
 
 class _AuthInterceptor extends Interceptor {
   @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final session = Supabase.instance.client.auth.currentSession;
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    var session = Supabase.instance.client.auth.currentSession;
+
+    // Auto-refresh if token is expired or about to expire (within 30s)
+    if (session != null && session.isExpired) {
+      try {
+        final refreshed = await Supabase.instance.client.auth.refreshSession();
+        session = refreshed.session;
+        debugPrint('[Auth] Token refreshed successfully');
+      } catch (e) {
+        debugPrint('[Auth] Token refresh failed: $e');
+      }
+    }
+
     if (session != null) {
       options.headers['Authorization'] = 'Bearer ${session.accessToken}';
     }

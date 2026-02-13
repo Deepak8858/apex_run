@@ -45,20 +45,46 @@ class ProfileDataSource {
     );
   }
 
+  /// Check if a username is available
+  Future<bool> isUsernameAvailable(String username) async {
+    final response = await _supabase
+        .from('user_profiles')
+        .select('id')
+        .ilike('username', username)
+        .maybeSingle();
+    return response == null;
+  }
+
   /// Update profile fields (without home location)
   Future<UserProfile> updateProfile({
     required String userId,
     String? displayName,
+    String? username,
     String? bio,
     String? avatarUrl,
+    double? heightCm,
+    double? weightKg,
+    int? age,
+    String? gender,
+    String? fitnessGoal,
+    int? dailyStepGoal,
+    bool? profileCompleted,
     int? privacyRadiusMeters,
     String? preferredDistanceUnit,
     String? preferredPaceFormat,
   }) async {
     final updates = <String, dynamic>{};
     if (displayName != null) updates['display_name'] = displayName;
+    if (username != null) updates['username'] = username;
     if (bio != null) updates['bio'] = bio;
     if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+    if (heightCm != null) updates['height_cm'] = heightCm;
+    if (weightKg != null) updates['weight_kg'] = weightKg;
+    if (age != null) updates['age'] = age;
+    if (gender != null) updates['gender'] = gender;
+    if (fitnessGoal != null) updates['fitness_goal'] = fitnessGoal;
+    if (dailyStepGoal != null) updates['daily_step_goal'] = dailyStepGoal;
+    if (profileCompleted != null) updates['profile_completed'] = profileCompleted;
     if (privacyRadiusMeters != null) {
       updates['privacy_radius_meters'] = privacyRadiusMeters;
     }

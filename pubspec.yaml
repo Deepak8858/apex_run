@@ -47,8 +47,8 @@ dependencies:
   dio: ^5.4.3
 
   # OAuth / Social Sign-In
-  google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.4
+  google_sign_in: ^6.2.1
   crypto: ^3.0.6
 
   # Maps & Location
@@ -79,6 +79,12 @@ dependencies:
 
   # Health Data (HRV, sleep via HealthKit/Health Connect)
   health: ^13.3.1
+
+  # Step Counter
+  pedometer: ^4.0.1
+
+  # Progress indicators
+  percent_indicator: ^4.2.3
 
   # Connectivity
   connectivity_plus: ^6.0.3

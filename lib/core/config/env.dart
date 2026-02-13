@@ -48,6 +48,23 @@ class Env {
     defaultValue: 'AQ.Ab8RN6JLx52aNNnmEVb6IoVrkCrsN5Hq3XKUW3hRn2gRKaxHyQ',
   );
 
+  // ── Google Sign-In Configuration ───────────────────────────────────
+  /// Web Client ID from Google Cloud Console (OAuth 2.0 Client Credentials)
+  /// This must match the Web Client ID configured in Supabase Auth → Google provider.
+  /// Pass via --dart-define=GOOGLE_WEB_CLIENT_ID=your-id.apps.googleusercontent.com
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4.apps.googleusercontent.com',
+  );
+
+  /// iOS Client ID from Google Cloud Console (OAuth 2.0 Client Credentials)
+  /// Required for native Google Sign-In on iOS.
+  /// Pass via --dart-define=GOOGLE_IOS_CLIENT_ID=your-id.apps.googleusercontent.com
+  static const String googleIosClientId = String.fromEnvironment(
+    'GOOGLE_IOS_CLIENT_ID',
+    defaultValue: '',
+  );
+
   static const String geminiModel = String.fromEnvironment(
     'GEMINI_MODEL',
     defaultValue: 'gemini-2.0-flash',

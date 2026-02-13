@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/user_profile.dart';
 import '../providers/auth_provider.dart';
 import '../providers/app_providers.dart';
+import '../providers/step_tracking_provider.dart';
+import 'activity_dashboard_screen.dart';
 
 /// Profile Screen - User Settings and Profile
 ///
@@ -23,18 +26,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isEditing = false;
   late TextEditingController _nameController;
   late TextEditingController _bioController;
+  late TextEditingController _heightController;
+  late TextEditingController _weightController;
+  late TextEditingController _ageController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _bioController = TextEditingController();
+    _heightController = TextEditingController();
+    _weightController = TextEditingController();
+    _ageController = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _heightController.dispose();
+    _weightController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -71,12 +83,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 24),
 
               if (_isEditing) ...[
-                _buildEditForm(context),
+                _buildEditForm(context, profileAsync.valueOrNull),
+                const SizedBox(height: 24),
+              ],
+
+              // Today's Activity Card
+              if (!_isEditing) ...[
+                _buildTodayActivityCard(context),
                 const SizedBox(height: 24),
               ],
 
               _buildStatsRow(context, activityCount, weeklyStats),
               const SizedBox(height: 24),
+
+              // Personal Info Section
+              if (!_isEditing) ...[
+                _buildPersonalInfoSection(context, profileAsync),
+                const SizedBox(height: 24),
+              ],
 
               if (!_isEditing) ...[
                 _buildPreferencesSection(context, profileAsync),
@@ -135,6 +159,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 letterSpacing: -0.5,
               ),
         ),
+        if (profile?.username != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '@${profile!.username}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.electricLime,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
         if (email != null) ...[
           const SizedBox(height: 8),
           Container(
@@ -170,7 +204,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildEditForm(BuildContext context) {
+  Widget _buildEditForm(BuildContext context, UserProfile? profile) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -197,42 +231,38 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextField(
             controller: _nameController,
             style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Display Name',
-              labelStyle: const TextStyle(color: AppTheme.textSecondary),
-              prefixIcon: const Icon(Icons.person_outline_rounded, color: AppTheme.textSecondary),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.surfaceLight),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.electricLime),
-              ),
-              filled: true,
-              fillColor: AppTheme.background,
-            ),
+            decoration: _inputDecoration('Display Name', Icons.person_outline_rounded),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _bioController,
             style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Bio',
-              labelStyle: const TextStyle(color: AppTheme.textSecondary),
-              prefixIcon: const Icon(Icons.info_outline_rounded, color: AppTheme.textSecondary),
-               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.surfaceLight),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.electricLime),
-              ),
-              filled: true,
-              fillColor: AppTheme.background,
-            ),
+            decoration: _inputDecoration('Bio', Icons.info_outline_rounded),
             maxLines: 2,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _heightController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+            decoration: _inputDecoration('Height (cm)', Icons.height_rounded, suffix: 'cm'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _weightController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+            decoration: _inputDecoration('Weight (kg)', Icons.monitor_weight_outlined, suffix: 'kg'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ageController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: _inputDecoration('Age', Icons.cake_rounded),
           ),
           const SizedBox(height: 24),
           Row(
@@ -264,6 +294,157 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon, {String? suffix}) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: AppTheme.textSecondary),
+      prefixIcon: Icon(icon, color: AppTheme.textSecondary),
+      suffixText: suffix,
+      suffixStyle: const TextStyle(color: AppTheme.textSecondary),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.surfaceLight),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.electricLime),
+      ),
+      filled: true,
+      fillColor: AppTheme.background,
+    );
+  }
+
+  Widget _buildTodayActivityCard(BuildContext context) {
+    final todayAsync = ref.watch(todayActivityProvider);
+    final snapshot = ref.watch(todayActivitySnapshotProvider);
+    final today = todayAsync.valueOrNull ?? snapshot;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ActivityDashboardScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppTheme.surfaceLight),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.directions_walk_rounded,
+                    color: AppTheme.electricLime),
+                const SizedBox(width: 8),
+                Text(
+                  'Today\'s Activity',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const Spacer(),
+                const Icon(Icons.arrow_forward_ios_rounded,
+                    size: 16, color: AppTheme.textTertiary),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _MiniStat(
+                    icon: Icons.directions_walk_rounded,
+                    value: '${today.steps}',
+                    label: 'Steps'),
+                _MiniStat(
+                    icon: Icons.local_fire_department_rounded,
+                    value: today.formattedCalories,
+                    label: 'Cal'),
+                _MiniStat(
+                    icon: Icons.straighten_rounded,
+                    value: today.formattedDistance,
+                    label: 'Distance'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfoSection(
+    BuildContext context,
+    AsyncValue<UserProfile?> profileAsync,
+  ) {
+    final profile = profileAsync.valueOrNull;
+    if (profile == null) return const SizedBox();
+
+    final hasInfo = profile.heightCm != null ||
+        profile.weightKg != null ||
+        profile.age != null ||
+        profile.gender != null ||
+        profile.fitnessGoal != null;
+
+    if (!hasInfo) return const SizedBox();
+
+    String genderLabel(String? g) {
+      switch (g) {
+        case 'male': return 'Male';
+        case 'female': return 'Female';
+        case 'other': return 'Other';
+        case 'prefer_not_to_say': return 'Not specified';
+        default: return '-';
+      }
+    }
+
+    String goalLabel(String? g) {
+      switch (g) {
+        case 'lose_weight': return 'Lose Weight';
+        case 'build_endurance': return 'Build Endurance';
+        case 'run_faster': return 'Run Faster';
+        case 'stay_active': return 'Stay Active';
+        case 'general_fitness': return 'General Fitness';
+        default: return '-';
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.surfaceLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              'Personal Info',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ),
+          if (profile.heightCm != null)
+            _InfoRow(icon: Icons.height_rounded, label: 'Height', value: '${profile.heightCm!.toStringAsFixed(0)} cm'),
+          if (profile.weightKg != null)
+            _InfoRow(icon: Icons.monitor_weight_outlined, label: 'Weight', value: '${profile.weightKg!.toStringAsFixed(0)} kg'),
+          if (profile.age != null)
+            _InfoRow(icon: Icons.cake_rounded, label: 'Age', value: '${profile.age}'),
+          if (profile.gender != null)
+            _InfoRow(icon: Icons.person_rounded, label: 'Gender', value: genderLabel(profile.gender)),
+          if (profile.fitnessGoal != null)
+            _InfoRow(icon: Icons.emoji_events_rounded, label: 'Goal', value: goalLabel(profile.fitnessGoal)),
+          _InfoRow(icon: Icons.directions_walk_rounded, label: 'Step Goal', value: '${profile.dailyStepGoal}'),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -402,15 +583,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _startEditing(UserProfile? profile) {
     _nameController.text = profile?.displayName ?? '';
     _bioController.text = profile?.bio ?? '';
+    _heightController.text = profile?.heightCm?.toStringAsFixed(0) ?? '';
+    _weightController.text = profile?.weightKg?.toStringAsFixed(0) ?? '';
+    _ageController.text = profile?.age?.toString() ?? '';
     setState(() => _isEditing = true);
   }
 
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
     final bio = _bioController.text.trim();
+    final height = double.tryParse(_heightController.text.trim());
+    final weight = double.tryParse(_weightController.text.trim());
+    final age = int.tryParse(_ageController.text.trim());
+
     await ref.read(profileControllerProvider.notifier).updateProfile(
           displayName: name.isNotEmpty ? name : null,
           bio: bio.isNotEmpty ? bio : null,
+          heightCm: height,
+          weightKg: weight,
+          age: age,
         );
     if (mounted) {
       setState(() => _isEditing = false);
@@ -583,6 +774,81 @@ class _PreferenceRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  const _MiniStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: AppTheme.electricLime, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppTheme.textSecondary),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondary,
+                  ),
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
       ),
     );
   }

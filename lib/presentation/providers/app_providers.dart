@@ -92,7 +92,15 @@ class ProfileController extends StateNotifier<AsyncValue<UserProfile?>> {
 
   Future<void> updateProfile({
     String? displayName,
+    String? username,
     String? bio,
+    double? heightCm,
+    double? weightKg,
+    int? age,
+    String? gender,
+    String? fitnessGoal,
+    int? dailyStepGoal,
+    bool? profileCompleted,
     int? privacyRadiusMeters,
     String? preferredDistanceUnit,
     String? preferredPaceFormat,
@@ -104,7 +112,15 @@ class ProfileController extends StateNotifier<AsyncValue<UserProfile?>> {
       final updated = await ds.updateProfile(
         userId: user.id,
         displayName: displayName,
+        username: username,
         bio: bio,
+        heightCm: heightCm,
+        weightKg: weightKg,
+        age: age,
+        gender: gender,
+        fitnessGoal: fitnessGoal,
+        dailyStepGoal: dailyStepGoal,
+        profileCompleted: profileCompleted,
         privacyRadiusMeters: privacyRadiusMeters,
         preferredDistanceUnit: preferredDistanceUnit,
         preferredPaceFormat: preferredPaceFormat,
@@ -348,17 +364,12 @@ class CoachController extends StateNotifier<CoachState> {
 // ============================================================
 
 final segmentsProvider =
-    FutureProvider.autoDispose<List<Segment>>((ref) async {
-  try {
-    final ds = ref.watch(segmentDataSourceProvider);
-    return await ds.getSegments();
-  } catch (e) {
-    debugPrint('segmentsProvider error: $e');
-    rethrow; // Let the UI show the error state with retry
-  }
+    FutureProvider<List<Segment>>((ref) async {
+  final ds = ref.watch(segmentDataSourceProvider);
+  return await ds.getSegments();
 });
 
-final segmentLeaderboardProvider = FutureProvider.autoDispose
+final segmentLeaderboardProvider = FutureProvider
     .family<List<SegmentEffort>, String>((ref, segmentId) async {
   final ds = ref.watch(segmentDataSourceProvider);
   return ds.getLeaderboard(segmentId);

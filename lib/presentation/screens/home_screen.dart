@@ -7,6 +7,8 @@ import '../../domain/models/gps_point.dart';
 import '../../domain/models/planned_workout.dart';
 import '../../domain/models/weekly_stats.dart';
 import '../providers/app_providers.dart';
+import '../providers/step_tracking_provider.dart';
+import 'activity_dashboard_screen.dart';
 import 'activity_detail_screen.dart';
 import 'form_analysis_screen.dart';
 
@@ -65,6 +67,10 @@ class HomeScreen extends ConsumerWidget {
                         color: AppTheme.textSecondary,
                       ),
                 ),
+                const SizedBox(height: 24),
+
+                // Today's Steps Card
+                _TodayStepsCard(),
                 const SizedBox(height: 24),
 
                 // Weekly Summary Card
@@ -1169,6 +1175,121 @@ class _LoadingCard extends StatelessWidget {
             color: AppTheme.electricLime,
             strokeWidth: 2,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's Steps compact card for the home dashboard
+class _TodayStepsCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final todayAsync = ref.watch(todayActivityProvider);
+    final snapshot = ref.watch(todayActivitySnapshotProvider);
+    final today = todayAsync.valueOrNull ?? snapshot;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ActivityDashboardScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.electricLime.withOpacity(0.08),
+              AppTheme.cardBackground,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppTheme.electricLime.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Progress ring
+            SizedBox(
+              width: 64,
+              height: 64,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    value: today.goalProgress,
+                    strokeWidth: 6,
+                    backgroundColor: AppTheme.surfaceLight,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      today.goalReached
+                          ? AppTheme.success
+                          : AppTheme.electricLime,
+                    ),
+                    strokeCap: StrokeCap.round,
+                  ),
+                  Icon(
+                    Icons.directions_walk_rounded,
+                    color: today.goalReached
+                        ? AppTheme.success
+                        : AppTheme.electricLime,
+                    size: 24,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Stats
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Today\'s Steps',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '${today.steps}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                      ),
+                      Text(
+                        ' / ${today.stepGoal}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                              color: AppTheme.textTertiary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${today.formattedCalories} cal · ${today.formattedDistance}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 16, color: AppTheme.textTertiary),
+          ],
         ),
       ),
     );
