@@ -106,7 +106,7 @@ class _OnboardingProfileScreenState
                         backgroundColor: AppTheme.electricLime,
                         foregroundColor: AppTheme.background,
                         disabledBackgroundColor:
-                            AppTheme.surfaceLight.withOpacity(0.5),
+                            AppTheme.surfaceLight.withValues(alpha: 0.5),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -223,7 +223,7 @@ class _OnboardingProfileScreenState
             labelText: 'Username',
             labelStyle: const TextStyle(color: AppTheme.textSecondary),
             hintText: 'e.g. fast_runner_42',
-            hintStyle: TextStyle(color: AppTheme.textTertiary.withOpacity(0.5)),
+            hintStyle: TextStyle(color: AppTheme.textTertiary.withValues(alpha: 0.5)),
             prefixIcon: const Icon(Icons.alternate_email_rounded,
                 color: AppTheme.textSecondary),
             suffixIcon: _buildUsernameSuffix(state),
@@ -326,7 +326,7 @@ class _OnboardingProfileScreenState
             labelText: 'Height (cm)',
             labelStyle: const TextStyle(color: AppTheme.textSecondary),
             hintText: 'e.g. 175',
-            hintStyle: TextStyle(color: AppTheme.textTertiary.withOpacity(0.5)),
+            hintStyle: TextStyle(color: AppTheme.textTertiary.withValues(alpha: 0.5)),
             prefixIcon: const Icon(Icons.height_rounded,
                 color: AppTheme.textSecondary),
             suffixText: 'cm',
@@ -361,7 +361,7 @@ class _OnboardingProfileScreenState
             labelText: 'Weight (kg)',
             labelStyle: const TextStyle(color: AppTheme.textSecondary),
             hintText: 'e.g. 70',
-            hintStyle: TextStyle(color: AppTheme.textTertiary.withOpacity(0.5)),
+            hintStyle: TextStyle(color: AppTheme.textTertiary.withValues(alpha: 0.5)),
             prefixIcon: const Icon(Icons.monitor_weight_outlined,
                 color: AppTheme.textSecondary),
             suffixText: 'kg',
@@ -424,7 +424,7 @@ class _OnboardingProfileScreenState
             labelText: 'Age',
             labelStyle: const TextStyle(color: AppTheme.textSecondary),
             hintText: 'e.g. 25',
-            hintStyle: TextStyle(color: AppTheme.textTertiary.withOpacity(0.5)),
+            hintStyle: TextStyle(color: AppTheme.textTertiary.withValues(alpha: 0.5)),
             prefixIcon: const Icon(Icons.cake_rounded,
                 color: AppTheme.textSecondary),
             enabledBorder: OutlineInputBorder(
@@ -595,7 +595,7 @@ class _GenderChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.electricLime.withOpacity(0.15)
+              ? AppTheme.electricLime.withValues(alpha: 0.15)
               : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
@@ -659,7 +659,7 @@ class _GoalCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.electricLime.withOpacity(0.1)
+              ? AppTheme.electricLime.withValues(alpha: 0.1)
               : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -673,7 +673,7 @@ class _GoalCard extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: selected
-                    ? AppTheme.electricLime.withOpacity(0.2)
+                    ? AppTheme.electricLime.withValues(alpha: 0.2)
                     : AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
               ),

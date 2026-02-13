@@ -56,18 +56,45 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Welcome Message
-                Text(
-                  'Welcome Back',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Ready to crush your next run?',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: AppTheme.textSecondary,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome Back',
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ready to crush your next run?',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                        ],
                       ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: AppTheme.textSecondary,
+                        size: 22,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Today's Steps Card
                 _TodayStepsCard(),
@@ -191,7 +218,7 @@ class _WeeklySummaryCard extends StatelessWidget {
         border: Border.all(color: AppTheme.surfaceLight),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -212,8 +239,8 @@ class _WeeklySummaryCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppTheme.electricLime.withOpacity(0.15),
-                      AppTheme.electricLime.withOpacity(0.02),
+                      AppTheme.electricLime.withValues(alpha: 0.15),
+                      AppTheme.electricLime.withValues(alpha: 0.02),
                       Colors.transparent,
                     ],
                   ),
@@ -230,7 +257,7 @@ class _WeeklySummaryCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppTheme.electricLime.withOpacity(0.1),
+                          color: AppTheme.electricLime.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -370,10 +397,10 @@ class _ActivityCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -452,7 +479,7 @@ class _ActivityCard extends StatelessWidget {
           const SizedBox(width: 8),
           Icon(
             Icons.chevron_right_rounded,
-            color: AppTheme.textTertiary.withOpacity(0.5),
+            color: AppTheme.textTertiary.withValues(alpha: 0.5),
           ),
         ],
       ),
@@ -541,7 +568,7 @@ class _MiniRoutePainter extends CustomPainter {
 
     // Glow
     final glowPaint = Paint()
-      ..color = AppTheme.electricLime.withOpacity(0.25)
+      ..color = AppTheme.electricLime.withValues(alpha: 0.25)
       ..strokeWidth = 4.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -549,7 +576,7 @@ class _MiniRoutePainter extends CustomPainter {
 
     // Main
     final mainPaint = Paint()
-      ..color = AppTheme.electricLime.withOpacity(0.9)
+      ..color = AppTheme.electricLime.withValues(alpha: 0.9)
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
@@ -812,14 +839,24 @@ class _QuickActionsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _QuickActionCard(
-            icon: Icons.camera_alt_rounded,
-            label: 'Form\nAnalysis',
-            color: AppTheme.info,
-            onTap: onFormAnalysis,
+        _QuickActionCard(
+          icon: Icons.camera_alt_rounded,
+          label: 'Form\nAnalysis',
+          description: 'AI-powered biomechanics feedback',
+          color: AppTheme.info,
+          onTap: onFormAnalysis,
+        ),
+        const SizedBox(height: 10),
+        _QuickActionCard(
+          icon: Icons.bar_chart_rounded,
+          label: 'Activity\nDashboard',
+          description: 'Steps, calories & daily activity',
+          color: AppTheme.electricLime,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ActivityDashboardScreen()),
           ),
         ),
       ],
@@ -830,10 +867,12 @@ class _QuickActionsRow extends StatelessWidget {
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String description;
   final Color color;
   final VoidCallback onTap;
   const _QuickActionCard({
     required this.icon, required this.label,
+    required this.description,
     required this.color, required this.onTap,
   });
 
@@ -874,7 +913,7 @@ class _QuickActionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Running Form Analysis',
+                      label.replaceAll('\n', ' '),
                       style: TextStyle(
                         color: AppTheme.textPrimary,
                         fontWeight: FontWeight.bold,
@@ -883,7 +922,7 @@ class _QuickActionCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'AI-powered biomechanics feedback',
+                      description,
                       style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 12,
@@ -917,10 +956,10 @@ class _WorkoutCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -933,9 +972,9 @@ class _WorkoutCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: iconColor.withOpacity(0.2)),
+              border: Border.all(color: iconColor.withValues(alpha: 0.2)),
             ),
             child: Icon(
               _workoutIcon(workout.workoutType),
@@ -973,7 +1012,7 @@ class _WorkoutCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.electricLime.withOpacity(0.3)),
+                border: Border.all(color: AppTheme.electricLime.withValues(alpha: 0.3)),
               ),
               child: Text(
                 workout.formattedTargetDistance!,
@@ -1060,7 +1099,7 @@ class _SectionHeader extends StatelessWidget {
                 borderRadius: BorderRadius.circular(2),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.electricLime.withOpacity(0.5),
+                    color: AppTheme.electricLime.withValues(alpha: 0.5),
                     blurRadius: 8,
                     offset: const Offset(0, 0),
                   ),
@@ -1095,9 +1134,9 @@ class _EmptyStateCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: AppTheme.cardBackground.withOpacity(0.5),
+        color: AppTheme.cardBackground.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
@@ -1133,9 +1172,9 @@ class _ErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.error.withOpacity(0.1),
+        color: AppTheme.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1199,7 +1238,7 @@ class _TodayStepsCard extends ConsumerWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppTheme.electricLime.withOpacity(0.08),
+              AppTheme.electricLime.withValues(alpha: 0.08),
               AppTheme.cardBackground,
             ],
             begin: Alignment.topLeft,
@@ -1207,7 +1246,7 @@ class _TodayStepsCard extends ConsumerWidget {
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: AppTheme.electricLime.withOpacity(0.3),
+            color: AppTheme.electricLime.withValues(alpha: 0.3),
           ),
         ),
         child: Row(

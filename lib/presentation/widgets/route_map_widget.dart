@@ -333,7 +333,7 @@ class _MapPlaceholder extends StatelessWidget {
                       ? Icons.my_location_rounded
                       : Icons.map_rounded,
                   size: 32,
-                  color: AppTheme.electricLime.withOpacity(0.5),
+                  color: AppTheme.electricLime.withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -349,7 +349,7 @@ class _MapPlaceholder extends StatelessWidget {
                   Text(
                     'Add MAPBOX_ACCESS_TOKEN for maps',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppTheme.textTertiary.withOpacity(0.5),
+                          color: AppTheme.textTertiary.withValues(alpha: 0.5),
                         ),
                   ),
                 ],
@@ -366,7 +366,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(ui.Canvas canvas, ui.Size size) {
     final paint = Paint()
-      ..color = AppTheme.surfaceLight.withOpacity(0.3)
+      ..color = AppTheme.surfaceLight.withValues(alpha: 0.3)
       ..strokeWidth = 0.5;
 
     const spacing = 30.0;
@@ -420,7 +420,7 @@ class _RoutePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = AppTheme.electricLime.withOpacity(0.7)
+        ..color = AppTheme.electricLime.withValues(alpha: 0.7)
         ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
@@ -438,7 +438,4 @@ class _RoutePainter extends CustomPainter {
       old.points.length != points.length;
 }
 
-/// Extension to convert Color to ARGB32 int for Mapbox annotations
-extension ColorArgb on Color {
-  int toARGB32() => value.toInt();
-}
+// Color.toARGB32() is built-in since Flutter 3.27

@@ -35,7 +35,7 @@ class AppTheme {
 
       colorScheme: ColorScheme.dark(
         primary: electricLime,
-        secondary: electricLime.withOpacity(0.7),
+        secondary: electricLime.withValues(alpha: 0.7),
         surface: cardBackground,
         surfaceTint: surfaceLight,
         error: error,
@@ -250,7 +250,7 @@ class AppTheme {
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
       colors: [
-        electricLime.withOpacity(0.1),
+        electricLime.withValues(alpha: 0.1),
         cardBackground,
       ],
     );
@@ -260,7 +260,7 @@ class AppTheme {
   static List<BoxShadow> get cardShadow {
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.black.withValues(alpha: 0.3),
         blurRadius: 8,
         offset: const Offset(0, 2),
       ),

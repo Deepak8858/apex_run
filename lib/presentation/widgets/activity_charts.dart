@@ -158,8 +158,8 @@ class _PaceChartPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.electricLime.withOpacity(0.3),
-            AppTheme.electricLime.withOpacity(0.02),
+            AppTheme.electricLime.withValues(alpha: 0.3),
+            AppTheme.electricLime.withValues(alpha: 0.02),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
     );
@@ -281,8 +281,8 @@ class _ElevationPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppTheme.elevation.withOpacity(0.3),
-            AppTheme.elevation.withOpacity(0.02),
+            AppTheme.elevation.withValues(alpha: 0.3),
+            AppTheme.elevation.withValues(alpha: 0.02),
           ],
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
     );

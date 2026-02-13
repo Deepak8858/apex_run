@@ -89,7 +89,7 @@ class _EmptySegments extends StatelessWidget {
             Icon(
               Icons.emoji_events_rounded,
               size: 80,
-              color: AppTheme.electricLime.withOpacity(0.3),
+              color: AppTheme.electricLime.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 24),
             Text('No Segments Yet',
@@ -191,7 +191,7 @@ class _SegmentCard extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppTheme.electricLime.withOpacity(0.1),
+                  color: AppTheme.electricLime.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.route_rounded,
@@ -404,7 +404,7 @@ class _LeaderboardRow extends StatelessWidget {
 
     return Card(
       color:
-          isTop3 ? medalColor.withOpacity(0.05) : AppTheme.cardBackground,
+          isTop3 ? medalColor.withValues(alpha: 0.05) : AppTheme.cardBackground,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(

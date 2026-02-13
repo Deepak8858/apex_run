@@ -43,7 +43,7 @@ class FormAnalysisScreen extends ConsumerWidget {
               readiness.when(
                 data: (score) => _ReadinessCard(score: score),
                 loading: () => const _ReadinessCard(score: 50),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, s) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 20),
 

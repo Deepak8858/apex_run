@@ -68,13 +68,13 @@ class AuthWrapper extends ConsumerWidget {
           loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           ),
-          error: (_, __) => const MainNavigation(),
+          error: (_, s) => const MainNavigation(),
         );
       },
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => const MainNavigation(),
+      error: (_, s) => const MainNavigation(),
     );
   }
 }

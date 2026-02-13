@@ -62,7 +62,7 @@ class ActivityDetailScreen extends ConsumerWidget {
                         child: Icon(
                           Icons.route_rounded,
                           size: 48,
-                          color: AppTheme.textTertiary.withOpacity(0.3),
+                          color: AppTheme.textTertiary.withValues(alpha: 0.3),
                         ),
                       ),
                     ),
@@ -126,10 +126,10 @@ class ActivityDetailScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+                        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -150,10 +150,10 @@ class ActivityDetailScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+                        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -283,10 +283,10 @@ class _MetricsGrid extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -450,10 +450,10 @@ class _SplitTimesWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -501,7 +501,7 @@ class _SplitTimesWidget extends StatelessWidget {
             return Container(
               color: i.isEven
                   ? Colors.transparent
-                  : AppTheme.surfaceLight.withOpacity(0.05),
+                  : AppTheme.surfaceLight.withValues(alpha: 0.05),
               padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(

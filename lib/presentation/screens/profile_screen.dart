@@ -83,7 +83,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 24),
 
               if (_isEditing) ...[
-                _buildEditForm(context, profileAsync.valueOrNull),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  child: _buildEditForm(context, profileAsync.valueOrNull),
+                ),
                 const SizedBox(height: 24),
               ],
 
@@ -132,7 +136,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             border: Border.all(color: AppTheme.electricLime, width: 2),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.electricLime.withOpacity(0.3),
+                color: AppTheme.electricLime.withValues(alpha: 0.3),
                 blurRadius: 24,
                 offset: const Offset(0, 8),
               ),
@@ -155,7 +159,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           profile?.displayName ?? email?.split('@').first ?? 'Runner',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 letterSpacing: -0.5,
               ),
         ),
@@ -174,7 +178,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceLight.withOpacity(0.5),
+              color: AppTheme.surfaceLight.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -230,20 +234,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 24),
           TextField(
             controller: _nameController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppTheme.textPrimary),
             decoration: _inputDecoration('Display Name', Icons.person_outline_rounded),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _bioController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppTheme.textPrimary),
             decoration: _inputDecoration('Bio', Icons.info_outline_rounded),
             maxLines: 2,
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _heightController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppTheme.textPrimary),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
             decoration: _inputDecoration('Height (cm)', Icons.height_rounded, suffix: 'cm'),
@@ -251,7 +255,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _weightController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppTheme.textPrimary),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
             decoration: _inputDecoration('Weight (kg)', Icons.monitor_weight_outlined, suffix: 'kg'),
@@ -259,7 +263,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           const SizedBox(height: 16),
           TextField(
             controller: _ageController,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: AppTheme.textPrimary),
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: _inputDecoration('Age', Icons.cake_rounded),
@@ -463,7 +467,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: activityCount.when(
               data: (c) => '$c',
               loading: () => '-',
-              error: (_, __) => '-',
+              error: (_, s) => '-',
             ),
             icon: Icons.directions_run_rounded,
             color: AppTheme.electricLime,
@@ -476,7 +480,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: weeklyStats.when(
               data: (s) => s.formattedDistance,
               loading: () => '-',
-              error: (_, __) => '-',
+              error: (_, s) => '-',
             ),
             icon: Icons.straighten_rounded,
             color: AppTheme.distance,
@@ -489,7 +493,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: weeklyStats.when(
               data: (s) => s.formattedPace,
               loading: () => '-',
-              error: (_, __) => '-',
+              error: (_, s) => '-',
             ),
             icon: Icons.speed_rounded,
             color: AppTheme.pace,
@@ -557,17 +561,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: () async {
+          final messenger = ScaffoldMessenger.of(context);
           try {
             await ref.read(authStateProvider.notifier).signOut();
             // AuthState change handles navigation
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
+              messenger.showSnackBar(
                 SnackBar(content: Text('Error: $e')),
               );
             }
           }
-
         },
         icon: const Icon(Icons.logout_rounded),
         label: const Text('Sign Out'),
@@ -643,18 +647,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
-            ...options.map((m) => RadioListTile<int>(
-                  value: m,
-                  groupValue: current,
+            ...options.map((m) => ListTile(
+                  leading: Icon(
+                    m == current ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    color: m == current ? AppTheme.electricLime : AppTheme.textTertiary,
+                  ),
                   title: Text('${m}m'),
-                  activeColor: AppTheme.electricLime,
-                  onChanged: (val) {
-                    if (val != null) {
-                      ref
-                          .read(profileControllerProvider.notifier)
-                          .updateProfile(privacyRadiusMeters: val);
-                      Navigator.pop(ctx);
-                    }
+                  onTap: () {
+                    ref
+                        .read(profileControllerProvider.notifier)
+                        .updateProfile(privacyRadiusMeters: m);
+                    Navigator.pop(ctx);
                   },
                 )),
           ],
@@ -687,14 +690,14 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.surfaceLight.withOpacity(0.5)),
+        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
       ),
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 24),
@@ -703,7 +706,7 @@ class _StatCard extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w800,
                   fontSize: 22,
                 ),
@@ -741,8 +744,8 @@ class _PreferenceRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        splashColor: AppTheme.electricLime.withOpacity(0.1),
-        highlightColor: AppTheme.electricLime.withOpacity(0.05),
+        splashColor: AppTheme.electricLime.withValues(alpha: 0.1),
+        highlightColor: AppTheme.electricLime.withValues(alpha: 0.05),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           child: Row(
@@ -798,7 +801,7 @@ class _MiniStat extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-            color: Colors.white,
+            color: AppTheme.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
@@ -844,7 +847,7 @@ class _InfoRow extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white,
+                  color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
           ),
