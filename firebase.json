@@ -1,0 +1,11 @@
+{
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "ApexRun",
+        "supportEmail": "deepak7238kgs@gmail.com"
+      }
+    }
+  }
+}

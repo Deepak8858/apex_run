@@ -30,14 +30,25 @@ final stepTrackingServiceProvider = Provider<StepTrackingService>((ref) {
 final todayActivityProvider = StreamProvider<DailyActivity>((ref) {
   final service = ref.watch(stepTrackingServiceProvider);
   // Emit current state first, then stream updates
-  return Stream.value(service.getTodayActivity())
-      .asyncExpand((_) => service.activityStream);
+  try {
+    final current = service.getTodayActivity();
+    return Stream.value(current)
+        .asyncExpand((_) => service.activityStream);
+  } catch (_) {
+    // If box isn't ready yet, just listen to the stream
+    return service.activityStream;
+  }
 });
 
 /// Today's activity snapshot (non-streaming, for initial display)
 final todayActivitySnapshotProvider = Provider<DailyActivity>((ref) {
   final service = ref.watch(stepTrackingServiceProvider);
-  return service.getTodayActivity();
+  try {
+    return service.getTodayActivity();
+  } catch (_) {
+    // Return default if Hive box isn't ready yet
+    return DailyActivity(date: DateTime.now());
+  }
 });
 
 // ============================================================
@@ -46,12 +57,20 @@ final todayActivitySnapshotProvider = Provider<DailyActivity>((ref) {
 
 final weeklyActivityProvider = Provider<List<DailyActivity>>((ref) {
   final service = ref.watch(stepTrackingServiceProvider);
-  return service.getHistory(days: 7);
+  try {
+    return service.getHistory(days: 7);
+  } catch (_) {
+    return [];
+  }
 });
 
 final monthlyActivityProvider = Provider<List<DailyActivity>>((ref) {
   final service = ref.watch(stepTrackingServiceProvider);
-  return service.getHistory(days: 30);
+  try {
+    return service.getHistory(days: 30);
+  } catch (_) {
+    return [];
+  }
 });
 
 // ============================================================

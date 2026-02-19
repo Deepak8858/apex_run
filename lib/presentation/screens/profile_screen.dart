@@ -145,10 +145,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: CircleAvatar(
             radius: 56,
             backgroundColor: AppTheme.cardBackground,
-            backgroundImage: profile?.avatarUrl != null
-                ? NetworkImage(profile!.avatarUrl!)
+            backgroundImage: profile?.avatarUrl != null &&
+                    profile!.avatarUrl!.startsWith('http')
+                ? NetworkImage(profile.avatarUrl!)
                 : null,
-            child: profile?.avatarUrl == null
+            child: profile?.avatarUrl == null ||
+                    !profile!.avatarUrl!.startsWith('http')
                 ? const Icon(Icons.person_rounded,
                     size: 56, color: AppTheme.textSecondary)
                 : null,

@@ -14,34 +14,13 @@
       },
       "oauth_client": [
         {
-          "client_id": "8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBEi5YYR60DlRgNTh_rREyEOOPZylRsqsw"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:8211368554:android:192066eb2529ee27ca1813",
-        "android_client_info": {
-          "package_name": "com.example.apex_run"
-        }
-      },
-      "oauth_client": [
+          "client_id": "8211368554-k35u7rmhgurhogo2t0ogoiek8371p32o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.apexrun.app",
+            "certificate_hash": "3fce4efa24dc9b45804e0603effa932c194e61de"
+          }
+        },
         {
           "client_id": "8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4.apps.googleusercontent.com",
           "client_type": 3

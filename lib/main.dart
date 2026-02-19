@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/env.dart';
@@ -11,6 +12,10 @@ import 'presentation/screens/auth_wrapper.dart';
 /// Main application entry point with Supabase and Riverpod initialization
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive for local storage (step tracking, etc.)
+  await Hive.initFlutter();
+  await Hive.openBox<Map>('daily_activity');
 
   // Initialize Mapbox
   if (Env.mapboxAccessToken.isNotEmpty) {
