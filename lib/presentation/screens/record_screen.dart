@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/permission_utils.dart';
 import '../../domain/models/tracking_metrics.dart';
@@ -44,6 +45,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   ];
 
   bool _isLocked = false;
+  bool _isSatelliteMap = false;
   int _currentMetricPage = 0;
   final PageController _metricPageController = PageController();
 
@@ -284,7 +286,41 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             child: RouteMapWidget(
               routePoints: metrics.routePoints,
               isLiveTracking: true,
+              styleUri: _isSatelliteMap ? MapboxStyles.SATELLITE_STREETS : MapboxStyles.DARK,
               padding: const EdgeInsets.only(top: 80, bottom: 380, left: 40, right: 40),
+            ),
+          ),
+          // Map Style Toggle
+          Positioned(
+            top: 100,
+            right: 16,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isSatelliteMap = !_isSatelliteMap);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isSatelliteMap ? AppTheme.electricLime : AppTheme.surfaceLight.withValues(alpha: 0.8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _isSatelliteMap ? Icons.satellite_alt_rounded : Icons.map_rounded,
+                    color: _isSatelliteMap ? AppTheme.background : AppTheme.textPrimary,
+                    size: 22,
+                  ),
+                ),
+              ),
             ),
           ),
           // Bottom gradient overlay
