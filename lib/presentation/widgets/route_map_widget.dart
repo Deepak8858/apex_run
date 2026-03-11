@@ -21,6 +21,7 @@ class RouteMapWidget extends StatefulWidget {
   final bool animateRoute;
   final double initialZoom;
   final EdgeInsets padding;
+  final String styleUri;
 
   const RouteMapWidget({
     super.key,
@@ -30,6 +31,7 @@ class RouteMapWidget extends StatefulWidget {
     this.animateRoute = false,
     this.initialZoom = 15.0,
     this.padding = const EdgeInsets.all(50),
+    this.styleUri = MapboxStyles.DARK,
   });
 
   @override
@@ -58,7 +60,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       mapOptions: MapOptions(
         pixelRatio: MediaQuery.of(context).devicePixelRatio,
       ),
-      styleUri: MapboxStyles.DARK,
+      styleUri: widget.styleUri,
       cameraOptions: _initialCamera(),
       onMapCreated: _onMapCreated,
     );
@@ -109,6 +111,11 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   @override
   void didUpdateWidget(covariant RouteMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.styleUri != oldWidget.styleUri) {
+      _mapboxMap?.loadStyleURI(widget.styleUri);
+      // Ensure annotations are redrawn after style change as they might be cleared or hidden
+      Future.delayed(const Duration(milliseconds: 500), () => _drawRoute());
+    }
     if (widget.routePoints.length != oldWidget.routePoints.length) {
       _drawRoute();
       if (widget.isLiveTracking && widget.routePoints.isNotEmpty) {
