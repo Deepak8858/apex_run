@@ -138,6 +138,9 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Start rate limit janitor to prevent memory leak
+	go rateLimitJanitor()
+
 	// Start server in goroutine
 	go func() {
 		log.Info("server listening", zap.String("addr", srv.Addr))
@@ -315,5 +318,19 @@ func healthHandler(db *database.DB, rds *database.Redis) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, response)
+	}
+}
+
+// rateLimitJanitor periodically removes stale IP buckets to prevent memory leaks.
+func rateLimitJanitor() {
+	ticker := time.NewTicker(5 * time.Minute)
+	for range ticker.C {
+		bucketsMu.Lock()
+		for ip, bucket := range ipBuckets {
+			if time.Since(bucket.lastReset) > 10*time.Minute {
+				delete(ipBuckets, ip)
+			}
+		}
+		bucketsMu.Unlock()
 	}
 }

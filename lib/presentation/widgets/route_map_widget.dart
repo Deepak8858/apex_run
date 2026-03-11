@@ -245,8 +245,16 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     }
   }
 
+  DateTime _lastFlyTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   Future<void> _flyToLatest() async {
     if (_mapboxMap == null || widget.routePoints.isEmpty) return;
+
+    // Throttle camera movements to once every 10 seconds during tracking
+    // to prevent jerky UX and allow users to pan manually.
+    final now = DateTime.now();
+    if (now.difference(_lastFlyTime) < const Duration(seconds: 10)) return;
+    _lastFlyTime = now;
 
     final latest = widget.routePoints.last;
     await _mapboxMap!.flyTo(
@@ -255,7 +263,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
             Point(coordinates: Position(latest.longitude, latest.latitude)),
         zoom: 16.0,
       ),
-      MapAnimationOptions(duration: 500),
+      MapAnimationOptions(duration: 1000),
     );
   }
 

@@ -1,0 +1,49 @@
+{
+  "bandit": {
+    "errors": [],
+    "generated_at": "2026-03-11T14:03:08Z",
+    "metrics": {
+      "./ml-service/main.py": {
+        "CONFIDENCE.HIGH": 0,
+        "CONFIDENCE.LOW": 0,
+        "CONFIDENCE.MEDIUM": 0,
+        "CONFIDENCE.UNDEFINED": 0,
+        "SEVERITY.HIGH": 0,
+        "SEVERITY.LOW": 0,
+        "SEVERITY.MEDIUM": 0,
+        "SEVERITY.UNDEFINED": 0,
+        "loc": 379,
+        "nosec": 0,
+        "skipped_tests": 0
+      },
+      "./ml-service/tflite_builder.py": {
+        "CONFIDENCE.HIGH": 0,
+        "CONFIDENCE.LOW": 0,
+        "CONFIDENCE.MEDIUM": 0,
+        "CONFIDENCE.UNDEFINED": 0,
+        "SEVERITY.HIGH": 0,
+        "SEVERITY.LOW": 0,
+        "SEVERITY.MEDIUM": 0,
+        "SEVERITY.UNDEFINED": 0,
+        "loc": 326,
+        "nosec": 0,
+        "skipped_tests": 0
+      },
+      "_totals": {
+        "CONFIDENCE.HIGH": 0,
+        "CONFIDENCE.LOW": 0,
+        "CONFIDENCE.MEDIUM": 0,
+        "CONFIDENCE.UNDEFINED": 0,
+        "SEVERITY.HIGH": 0,
+        "SEVERITY.LOW": 0,
+        "SEVERITY.MEDIUM": 0,
+        "SEVERITY.UNDEFINED": 0,
+        "loc": 705,
+        "nosec": 0,
+        "skipped_tests": 0
+      }
+    },
+    "results": []
+  },
+  "safety_error": "Expecting value: line 3 column 1 (char 2)"
+}

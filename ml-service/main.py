@@ -26,7 +26,6 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -355,7 +354,14 @@ async def list_tflite_models():
 @app.get("/api/v1/models/{filename}")
 async def download_tflite_model(filename: str):
     """Download a TFLite model file for on-device deployment."""
-    filepath = MODELS_DIR / filename
+    # Prevent path traversal
+    if ".." in filename or filename.startswith("/") or filename.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    filepath = (MODELS_DIR / filename).resolve()
+    if not filepath.is_relative_to(MODELS_DIR.resolve()):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not filepath.exists():
         raise HTTPException(status_code=404, detail=f"Model '{filename}' not found. Run /api/v1/models/build first.")
     return FileResponse(
@@ -368,7 +374,16 @@ async def download_tflite_model(filename: str):
 @app.get("/api/v1/models/{model_name}/normalization")
 async def get_normalization_params(model_name: str):
     """Get normalization parameters for a model (mean/std for inputs)."""
-    norm_path = MODELS_DIR / f"{model_name}_norm_params.json"
+    # Prevent path traversal
+    if ".." in model_name or model_name.startswith("/") or model_name.startswith("\\"):
+        raise HTTPException(status_code=400, detail="Invalid model name")
+
+    filename = f"{model_name}_norm_params.json"
+    norm_path = (MODELS_DIR / filename).resolve()
+    
+    if not norm_path.is_relative_to(MODELS_DIR.resolve()):
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not norm_path.exists():
         raise HTTPException(status_code=404, detail=f"Normalization params for '{model_name}' not found.")
     with open(norm_path) as f:

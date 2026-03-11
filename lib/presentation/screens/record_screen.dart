@@ -81,7 +81,6 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(trackingControllerProvider);
-    final metrics = ref.watch(trackingMetricsProvider);
 
     ref.listen<TrackingControllerState>(trackingControllerProvider, (prev, next) {
       if (next.lastSavedActivity != null && prev?.lastSavedActivity == null) {
@@ -104,7 +103,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
 
     if (isSaving) return _buildSavingView(context);
     if (isIdle) return _buildIdleView(context);
-    return _buildTrackingView(context, controllerState, metrics);
+    return _buildTrackingView(context, controllerState);
   }
 
   // ============================================================
@@ -270,12 +269,10 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   Widget _buildTrackingView(
     BuildContext context,
     TrackingControllerState controllerState,
-    AsyncValue<TrackingMetrics> metricsAsync,
   ) {
     final isPaused = controllerState.trackingState == TrackingState.paused;
-    final metrics = metricsAsync.valueOrNull ?? const TrackingMetrics();
 
-    if (_isLocked) return _buildLockedView(context, metrics, isPaused);
+    if (_isLocked) return _buildLockedView(context, isPaused);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -283,11 +280,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
         children: [
           // Full-screen map
           Positioned.fill(
-            child: RouteMapWidget(
-              routePoints: metrics.routePoints,
-              isLiveTracking: true,
-              styleUri: _isSatelliteMap ? MapboxStyles.SATELLITE_STREETS : MapboxStyles.DARK,
-              padding: const EdgeInsets.only(top: 80, bottom: 380, left: 40, right: 40),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final points = ref.watch(trackingMetricsProvider.select((m) => m.routePoints));
+                return RouteMapWidget(
+                  routePoints: points,
+                  isLiveTracking: true,
+                  styleUri: _isSatelliteMap ? MapboxStyles.SATELLITE_STREETS : MapboxStyles.DARK,
+                  padding: const EdgeInsets.only(top: 80, bottom: 380, left: 40, right: 40),
+                );
+              },
             ),
           ),
           // Map Style Toggle
@@ -417,7 +419,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             right: 0,
             child: SafeArea(
               top: false,
-              child: _buildMetricsOverlay(context, metrics, isPaused),
+              child: _buildMetricsOverlay(context, isPaused),
             ),
           ),
         ],
@@ -425,20 +427,25 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
     );
   }
 
-  Widget _buildMetricsOverlay(BuildContext context, TrackingMetrics metrics, bool isPaused) {
+  Widget _buildMetricsOverlay(BuildContext context, bool isPaused) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Duration (hero metric)
-        Text(
-          metrics.formattedDuration,
-          style: const TextStyle(
-            fontSize: 72,
-            fontWeight: FontWeight.w100,
-            color: AppTheme.textPrimary,
-            letterSpacing: 4,
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
+        Consumer(
+          builder: (context, ref, _) {
+            final duration = ref.watch(trackingMetricsProvider.select((m) => m.formattedDuration));
+            return Text(
+              duration,
+              style: const TextStyle(
+                fontSize: 72,
+                fontWeight: FontWeight.w100,
+                color: AppTheme.textPrimary,
+                letterSpacing: 4,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 2),
         Text('Duration',
@@ -456,17 +463,26 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             controller: _metricPageController,
             onPageChanged: (i) => setState(() => _currentMetricPage = i),
             children: [
-              _MetricRow(
-                left: _MetricInfo('Distance', metrics.formattedDistance,
-                    metrics.distanceUnit, AppTheme.distance),
-                right: _MetricInfo('Avg Pace', metrics.formattedPace,
-                    'min/km', AppTheme.pace),
+              Consumer(
+                builder: (context, ref, _) {
+                  final distance = ref.watch(trackingMetricsProvider.select((m) => m.formattedDistance));
+                  final unit = ref.watch(trackingMetricsProvider.select((m) => m.distanceUnit));
+                  final pace = ref.watch(trackingMetricsProvider.select((m) => m.formattedPace));
+                  return _MetricRow(
+                    left: _MetricInfo('Distance', distance, unit, AppTheme.distance),
+                    right: _MetricInfo('Avg Pace', pace, 'min/km', AppTheme.pace),
+                  );
+                },
               ),
-              _MetricRow(
-                left: _MetricInfo('Speed',
-                    metrics.currentSpeedKmh.toStringAsFixed(1), 'km/h', AppTheme.elevation),
-                right: _MetricInfo('GPS Points',
-                    '${metrics.routePoints.length}', 'pts', AppTheme.info),
+              Consumer(
+                builder: (context, ref, _) {
+                  final speed = ref.watch(trackingMetricsProvider.select((m) => m.currentSpeedKmh));
+                  final points = ref.watch(trackingMetricsProvider.select((m) => m.routePoints.length));
+                  return _MetricRow(
+                    left: _MetricInfo('Speed', speed.toStringAsFixed(1), 'km/h', AppTheme.elevation),
+                    right: _MetricInfo('GPS Points', '$points', 'pts', AppTheme.info),
+                  );
+                },
               ),
             ],
           ),
@@ -538,7 +554,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   // ============================================================
   // LOCKED VIEW
   // ============================================================
-  Widget _buildLockedView(BuildContext context, TrackingMetrics metrics, bool isPaused) {
+  Widget _buildLockedView(BuildContext context, bool isPaused) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: GestureDetector(
@@ -552,23 +568,39 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             child: Column(
               children: [
                 const Spacer(),
-                Text(
-                  metrics.formattedDuration,
-                  style: TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.w100,
-                    color: AppTheme.textPrimary.withValues(alpha: 0.9),
-                    letterSpacing: 4,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final duration = ref.watch(trackingMetricsProvider.select((m) => m.formattedDuration));
+                    return Text(
+                      duration,
+                      style: TextStyle(
+                        fontSize: 80,
+                        fontWeight: FontWeight.w100,
+                        color: AppTheme.textPrimary.withValues(alpha: 0.9),
+                        letterSpacing: 4,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LockedMetric(value: metrics.formattedDistance, unit: metrics.distanceUnit),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final distance = ref.watch(trackingMetricsProvider.select((m) => m.formattedDistance));
+                        final unit = ref.watch(trackingMetricsProvider.select((m) => m.distanceUnit));
+                        return _LockedMetric(value: distance, unit: unit);
+                      },
+                    ),
                     const SizedBox(width: 32),
-                    _LockedMetric(value: metrics.formattedPace, unit: 'min/km'),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final pace = ref.watch(trackingMetricsProvider.select((m) => m.formattedPace));
+                        return _LockedMetric(value: pace, unit: 'min/km');
+                      },
+                    ),
                   ],
                 ),
                 const Spacer(),

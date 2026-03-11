@@ -18,24 +18,13 @@ class LeaderboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final segments = ref.watch(segmentsProvider);
-    final selectedSegment = ref.watch(selectedSegmentProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title:
-            Text(selectedSegment != null ? 'Leaderboard' : 'Segments'),
-        leading: selectedSegment != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () =>
-                    ref.read(selectedSegmentProvider.notifier).state = null,
-              )
-            : null,
+        title: const Text('Segments'),
       ),
       body: SafeArea(
-        child: selectedSegment != null
-            ? _SegmentLeaderboardView(segment: selectedSegment)
-            : _SegmentListView(segmentsAsync: segments),
+        child: _SegmentListView(segmentsAsync: segments),
       ),
     );
   }
@@ -181,7 +170,12 @@ class _SegmentCard extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          ref.read(selectedSegmentProvider.notifier).state = segment;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => _SegmentLeaderboardScreen(segment: segment),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -262,6 +256,27 @@ class _SegmentCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// Segment Leaderboard Screen (Dedicated Page)
+// ============================================================
+
+class _SegmentLeaderboardScreen extends StatelessWidget {
+  final Segment segment;
+  const _SegmentLeaderboardScreen({required this.segment});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Leaderboard'),
+      ),
+      body: SafeArea(
+        child: _SegmentLeaderboardView(segment: segment),
       ),
     );
   }
