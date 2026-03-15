@@ -42,6 +42,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
   PolylineAnnotationManager? _glowManager;
+  PolylineAnnotationManager? _riskManager;
   PointAnnotationManager? _pointManager;
   PolylineAnnotation? _mainLine;
   PolylineAnnotation? _glowLine;
@@ -98,6 +99,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
 
     // Create glow manager first (renders behind main line)
     _glowManager =
+        await map.annotations.createPolylineAnnotationManager();
+    _riskManager =
         await map.annotations.createPolylineAnnotationManager();
     _polylineManager =
         await map.annotations.createPolylineAnnotationManager();
@@ -197,10 +200,12 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       _glowLine!.geometry = geometry;
       await _polylineManager!.update(_mainLine!);
       await _glowManager!.update(_glowLine!);
+      await _drawRiskSegments();
     } else {
       // First time draw or after style change
       await _polylineManager!.deleteAll();
       await _glowManager!.deleteAll();
+      await _riskManager!.deleteAll();
 
       _glowLine = await _glowManager?.create(PolylineAnnotationOptions(
         geometry: geometry,
@@ -215,6 +220,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
         lineWidth: 4.0,
         lineOpacity: 0.95,
       ));
+
+      await _drawRiskSegments();
     }
 
     _drawMarkers();
@@ -307,11 +314,41 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     _mapboxMap!.setCamera(camera);
   }
 
+  /// Phase 4a: Dynamic Layers
+  /// Colors segments based on biomechanical risk (Stiffness / Knee Flexion)
+  Future<void> _drawRiskSegments() async {
+    if (_riskManager == null || widget.routePoints.length < 2) return;
+    await _riskManager!.deleteAll();
+
+    for (int i = 0; i < widget.routePoints.length - 1; i++) {
+      final p1 = widget.routePoints[i];
+      final p2 = widget.routePoints[i + 1];
+
+      // Check for high risk indicators
+      // Stiffness < 3.0 or Flexion < 158 indicates potential form breakdown
+      bool isHighRisk = (p2.stiffnessIndex != null && p2.stiffnessIndex! < 3.0) ||
+                        (p2.peakKneeFlexion != null && p2.peakKneeFlexion! < 158);
+
+      if (isHighRisk) {
+        await _riskManager!.create(PolylineAnnotationOptions(
+          geometry: LineString(coordinates: [
+            Position(p1.longitude, p1.latitude),
+            Position(p2.longitude, p2.latitude),
+          ]),
+          lineColor: AppTheme.error.toARGB32(),
+          lineWidth: 6.0,
+          lineOpacity: 1.0,
+        ));
+      }
+    }
+  }
+
   @override
   void dispose() {
     _animTimer?.cancel();
     _polylineManager = null;
     _glowManager = null;
+    _riskManager = null;
     _pointManager = null;
     super.dispose();
   }

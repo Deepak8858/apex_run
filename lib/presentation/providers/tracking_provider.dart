@@ -15,6 +15,11 @@ import 'app_providers.dart';
 /// Provider for the GPS tracking service singleton
 final gpsTrackingServiceProvider = Provider<GpsTrackingService>((ref) {
   final service = GpsTrackingService();
+  
+  // Inject gait calculator for dynamic layer telemetry
+  final gaitCalc = ref.watch(gaitCalculatorProvider);
+  service.setGaitCalculator(gaitCalc);
+  
   ref.onDispose(() => service.dispose());
   return service;
 });

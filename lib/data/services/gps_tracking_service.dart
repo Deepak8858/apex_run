@@ -7,12 +7,10 @@ import '../../core/utils/gps_utils.dart';
 import '../../domain/models/activity.dart';
 import '../../domain/models/gps_point.dart';
 import '../../domain/models/tracking_metrics.dart';
+import '../../ml/gait_metrics_calculator.dart';
 
 /// GPS Tracking Service — Phase 4b upgrade
-///
-/// Background-capable GPS tracking using geolocator's platform-specific
-/// settings. On Android, a foreground service notification keeps GPS alive
-/// through OS Doze mode. On iOS, `allowBackgroundLocationUpdates` is set.
+/// ...
 class GpsTrackingService {
   final List<GpsPoint> _recordedPoints = [];
   DateTime? _startTime;
@@ -21,7 +19,12 @@ class GpsTrackingService {
   TrackingState _state = TrackingState.idle;
   StreamSubscription<Position>? _positionSubscription;
 
+  // Added gait calculator for dynamic layer telemetry
+  GaitMetricsCalculator? _gaitCalculator;
+  void setGaitCalculator(GaitMetricsCalculator calculator) => _gaitCalculator = calculator;
+
   final _metricsController = StreamController<TrackingMetrics>.broadcast();
+  // ...
 
   Stream<TrackingMetrics> get metricsStream => _metricsController.stream;
   TrackingState get state => _state;
@@ -217,7 +220,20 @@ class GpsTrackingService {
   void _onPositionUpdate(Position position) {
     if (_state != TrackingState.tracking) return;
 
-    final point = GpsPoint.fromPosition(position);
+    // Phase 4a: Inject biomechanical telemetry for dynamic map layers
+    double? stiffness;
+    double? flexion;
+    
+    if (_gaitCalculator != null) {
+      stiffness = _gaitCalculator!.calculateStiffnessIndex();
+      flexion = _gaitCalculator!.calculatePeakKneeFlexion();
+    }
+
+    final point = GpsPoint.fromPosition(position).copyWith(
+      stiffnessIndex: (stiffness != null && stiffness > 0) ? stiffness : null,
+      peakKneeFlexion: (flexion != null && flexion < 180) ? flexion : null,
+    );
+    
     _recordedPoints.add(point);
     _emitMetrics();
   }
