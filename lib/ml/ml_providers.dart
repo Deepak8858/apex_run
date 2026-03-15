@@ -5,6 +5,7 @@ import 'form_analyzer.dart';
 import 'hrv_service.dart';
 import 'gait_metrics_calculator.dart';
 import 'tflite_model_service.dart';
+import 'agent_service.dart';
 import 'pose_camera_service.dart';
 import 'models/form_analysis_result.dart';
 import 'models/hrv_data.dart';
@@ -225,6 +226,53 @@ final hrvTrendProvider = Provider<double?>((ref) {
   final service = ref.watch(hrvServiceProvider);
   return service.getHrvTrend();
 });
+
+// ============================================================
+// Agent Service Provider
+// ============================================================
+
+/// Provides the Agent service for Recovery, Ghost Racing, and Routing
+final agentServiceProvider = Provider<AgentService>((ref) {
+  final service = AgentService();
+  service.initialize();
+  return service;
+});
+
+/// Recovery analysis provider
+final recoveryAnalysisProvider =
+    FutureProvider.family<RecoveryResponse?, RecoveryRequest>((ref, request) async {
+  final service = ref.watch(agentServiceProvider);
+  return service.analyzeRecovery(request);
+});
+
+/// Ghost racing sync provider
+final ghostSyncProvider =
+    FutureProvider.family<GhostStatusResponse?, GhostMatchRequest>((ref, request) async {
+  final service = ref.watch(agentServiceProvider);
+  return service.syncGhost(request);
+});
+
+/// Route risk analysis provider
+final routeRiskProvider =
+    FutureProvider.family<RiskAwareRouteResponse?, RiskAwareRouteRequest>((ref, request) async {
+  final service = ref.watch(agentServiceProvider);
+  return service.analyzeRouteRisk(request);
+});
+
+// ============================================================
+// Mock Providers for UI Integration
+// ============================================================
+final mockGhostStatusProvider = StateProvider<GhostStatusResponse?>((ref) => GhostStatusResponse(
+  ghostDistM: 1200, gapM: -15.5, status: 'racing'
+));
+
+final mockRouteRiskProvider = StateProvider<RiskAwareRouteResponse?>((ref) => RiskAwareRouteResponse(
+  selectedRouteId: 'r1', riskLevel: 'High', reasoning: 'High fatigue detected. Modifying route to avoid steep descents.', safetyModifierApplied: true
+));
+
+final mockGoalImpactProvider = StateProvider<ActivitySummaryResponse?>((ref) => ActivitySummaryResponse(
+  summary: 'Great run! Kept HR steady in Zone 2. Form held up well despite minor fatigue in the last km.', impactOnGoal: 'On track for Sub-20 5K goal. Your aerobic base is expanding.', suggestedRestHours: 12
+));
 
 // ============================================================
 // TFLite Model Service

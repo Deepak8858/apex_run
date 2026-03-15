@@ -6,7 +6,11 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/permission_utils.dart';
 import '../../domain/models/tracking_metrics.dart';
 import '../providers/tracking_provider.dart';
+import '../../ml/ml_providers.dart';
+import '../../ml/agent_service.dart';
 import '../widgets/route_map_widget.dart';
+import '../widgets/ghost_racing_overlay.dart';
+import '../widgets/routing_safety_alert.dart';
 import 'activity_detail_screen.dart';
 
 /// Record Screen - Strava-inspired GPS Activity Tracking
@@ -170,6 +174,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                     contentPadding: EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Race a Ghost Action
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _GhostRacingCard(
+                onTap: () => _showGhostSelector(context),
               ),
             ),
             const Spacer(),
@@ -355,58 +367,76 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: (isPaused ? AppTheme.warning : AppTheme.success)
-                            .withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: (isPaused ? AppTheme.warning : AppTheme.success)
+                                .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isPaused ? AppTheme.warning : AppTheme.success,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isPaused ? 'PAUSED' : 'REC',
+                                style: TextStyle(
+                                  color: isPaused ? AppTheme.warning : AppTheme.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() => _isLocked = true);
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isPaused ? AppTheme.warning : AppTheme.success,
+                              color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                             ),
+                            child: const Icon(Icons.lock_open_rounded,
+                                size: 18, color: AppTheme.textSecondary),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isPaused ? 'PAUSED' : 'REC',
-                            style: TextStyle(
-                              color: isPaused ? AppTheme.warning : AppTheme.success,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        setState(() => _isLocked = true);
-                      },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                         ),
-                        child: const Icon(Icons.lock_open_rounded,
-                            size: 18, color: AppTheme.textSecondary),
-                      ),
+                        const SizedBox(width: 8),
+                        const _GpsSignalIndicator(compact: true),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    const _GpsSignalIndicator(compact: true),
+                    const SizedBox(height: 12),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final risk = ref.watch(mockRouteRiskProvider);
+                        return RoutingSafetyAlert(routeRisk: risk);
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final ghost = ref.watch(mockGhostStatusProvider);
+                        return GhostRacingOverlay(ghostStatus: ghost);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -791,6 +821,94 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
       ),
     );
   }
+
+  void _showGhostSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Select a Ghost',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            Expanded(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final activities = ref.watch(recentActivitiesProvider);
+                  return activities.when(
+                    data: (list) => ListView.separated(
+                      itemCount: list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (ctx, i) {
+                        final act = list[i];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: AppTheme.surfaceLight),
+                          ),
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.electricLime.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.directions_run_rounded,
+                                color: AppTheme.electricLime),
+                          ),
+                          title: Text(
+                            act.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            '${act.formattedDistance} • ${act.formattedDuration}',
+                          ),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Racing against ${act.name}! 👻'),
+                                backgroundColor: AppTheme.electricLime,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Error loading ghosts: $e')),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================================
@@ -1103,6 +1221,77 @@ class _LockedMetric extends StatelessWidget {
         Text(unit,
             style: const TextStyle(fontSize: 12, color: AppTheme.textTertiary)),
       ],
+    );
+  }
+}
+
+    );
+  }
+}
+
+// ============================================================
+// Ghost Racing Widgets
+// ============================================================
+
+class _GhostRacingCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GhostRacingCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.electricLime.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.electricLime.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.electricLime.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.ghost_fixed_rounded,
+                    color: AppTheme.electricLime, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Race a Ghost',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Compete against a friend\'s past run',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppTheme.electricLime, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

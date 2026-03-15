@@ -1,6 +1,9 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 import '../core/config/env.dart';
 import 'models/form_analysis_result.dart';
 
@@ -23,6 +26,7 @@ enum TFLiteModel {
 class TFLiteModelService {
   late final Dio _dio;
   final Map<String, Map<String, dynamic>> _normParams = {};
+  final Map<TFLiteModel, Interpreter> _interpreters = {};
   bool _initialized = false;
   bool _serverAvailable = false;
 
@@ -32,7 +36,7 @@ class TFLiteModelService {
   /// Whether the ML server is reachable
   bool get isServerAvailable => _serverAvailable;
 
-  /// Initialize the service — load normalization params if available
+  /// Initialize the service — load normalization params and download models
   Future<void> initialize() async {
     if (_initialized) return;
 
@@ -49,23 +53,25 @@ class TFLiteModelService {
     );
 
     try {
-      // Check server health first
+      // Check server health
       final healthResp = await _dio.get('/api/v1/gait/injury-risk',
           queryParameters: {'check': 'health'}).timeout(
         const Duration(seconds: 5),
         onTimeout: () => throw Exception('Health check timed out'),
       );
       _serverAvailable = healthResp.statusCode == 200 ||
-          healthResp.statusCode == 422; // 422 = validation error (server is up)
+          healthResp.statusCode == 422;
 
       if (_serverAvailable) {
         for (final model in TFLiteModel.values) {
           await _loadNormalizationParams(model);
+          await _downloadAndInitModel(model);
         }
       }
+      
       debugPrint('TFLiteModelService: Initialized — '
           'server=${_serverAvailable ? "online" : "offline"}, '
-          'models=${_normParams.length}');
+          'local_models=${_interpreters.length}');
     } catch (e) {
       _serverAvailable = false;
       debugPrint('TFLiteModelService: Init warning — $e (using on-device rules)');
@@ -73,40 +79,112 @@ class TFLiteModelService {
     _initialized = true;
   }
 
-  /// Load normalization parameters for a model from server
-  Future<void> _loadNormalizationParams(TFLiteModel model) async {
+  /// Download model from server and initialize TFLite interpreter
+  Future<void> _downloadAndInitModel(TFLiteModel model) async {
     try {
-      final response = await _dio.get(
-        '/api/v1/models/${model.apiName}/normalization',
-      );
-      if (response.statusCode == 200) {
-        _normParams[model.apiName] = Map<String, dynamic>.from(response.data);
+      final appDir = await getApplicationDocumentsDirectory();
+      final modelFile = File('${appDir.path}/${model.filename}');
+
+      // If model doesn't exist locally, download it
+      if (!await modelFile.exists()) {
+        debugPrint('TFLiteModelService: Downloading ${model.apiName}...');
+        await _dio.download(
+          '/api/v1/models/${model.filename}',
+          modelFile.path,
+        );
       }
+
+      // Initialize Interpreter
+      final interpreter = Interpreter.fromFile(modelFile);
+      _interpreters[model] = interpreter;
     } catch (e) {
-      debugPrint('TFLiteModelService: Could not load norm params for ${model.apiName}');
+      debugPrint('TFLiteModelService: Could not init local model ${model.apiName}: $e');
     }
   }
 
-  /// Run prediction using server-side TFLite inference with on-device fallback
-  ///
-  /// Tries server inference first if available, otherwise uses
-  /// highly-tuned rule-based on-device prediction.
+  /// Run prediction using local TFLite engine with server/rule fallback
   Future<Map<String, dynamic>> predict(
     TFLiteModel model,
     List<double> features,
   ) async {
-    // If server is known to be unavailable, skip directly to rules
-    if (!_serverAvailable) {
-      return _ruleBasedFallback(model, features);
+    // 1. Try Local TFLite Inference first (Fastest/Offline)
+    if (_interpreters.containsKey(model)) {
+      try {
+        return _runLocalInference(model, features);
+      } catch (e) {
+        debugPrint('TFLiteModelService: Local inference failed for ${model.apiName}: $e');
+      }
     }
 
-    try {
-      return await _serverInference(model, features);
-    } catch (e) {
-      debugPrint('TFLiteModelService: Server inference failed — using on-device rules: $e');
-      _serverAvailable = false; // Cache failure to avoid repeated timeouts
-      return _ruleBasedFallback(model, features);
+    // 2. Try Server Inference if online
+    if (_serverAvailable) {
+      try {
+        return await _serverInference(model, features);
+      } catch (e) {
+        debugPrint('TFLiteModelService: Server inference failed: $e');
+        _serverAvailable = false;
+      }
     }
+
+    // 3. Last Resort: Rule-based fallback
+    return _ruleBasedFallback(model, features);
+  }
+
+  /// Execute on-device TFLite inference
+  Map<String, dynamic> _runLocalInference(TFLiteModel model, List<double> features) {
+    final interpreter = _interpreters[model]!;
+    
+    // Normalize features if params available
+    List<double> normalizedFeatures = features;
+    final params = _normParams[model.apiName];
+    if (params != null) {
+      final means = List<double>.from(params['mean']);
+      final stds = List<double>.from(params['std']);
+      normalizedFeatures = List.generate(features.length, (i) {
+        return (features[i] - means[i]) / stds[i];
+      });
+    }
+
+    // Prepare input (Tensor 1xN) and output (Tensor 1xM)
+    final input = [normalizedFeatures];
+    final output = List.filled(interpreter.getOutputTensors().first.shape.last, 0.0).reshape([1, -1]);
+
+    interpreter.run(input, output);
+    final prediction = List<double>.from(output[0]);
+
+    // Reuse the interpretation logic from the backend (implemented here in Dart)
+    // In a real app, this would be a shared utility or duplicated logic.
+    return _interpretLocalPrediction(model.apiName, prediction, features);
+  }
+
+  Map<String, dynamic> _interpretLocalPrediction(String modelName, List<double> prediction, List<double> features) {
+    // Ported interpretation logic from main.py
+    if (modelName == 'gait_form') {
+      final score = prediction[0].clamp(0, 100);
+      final level = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'needs_work' : 'poor';
+      return {'form_score': score, 'level': level};
+    } else if (modelName == 'injury_risk') {
+      final levels = ['low', 'moderate', 'high'];
+      int maxIdx = 0;
+      double maxVal = prediction[0];
+      for (int i = 1; i < prediction.length; i++) {
+        if (prediction[i] > maxVal) {
+          maxVal = prediction[i];
+          maxIdx = i;
+        }
+      }
+      return {
+        'risk_level': levels[maxIdx],
+        'confidence': maxVal * 100,
+      };
+    } else if (modelName == 'performance') {
+      final t5k = prediction[0];
+      return {
+        'predicted_5k_seconds': t5k.toInt(),
+        'predicted_10k_seconds': (t5k * math.pow(10 / 5, 1.06)).toInt(),
+      };
+    }
+    return {};
   }
 
   /// Analyze form analysis results and return injury risk + gait score

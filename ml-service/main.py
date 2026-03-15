@@ -86,6 +86,100 @@ class TrainingLoadResponse(BaseModel):
     recommendation: str
 
 
+class RecoveryRequest(BaseModel):
+    """Request for daily recovery analysis."""
+    user_id: str
+    hrv_rmssd: float
+    sleep_score: int  # 0-100
+    resting_heart_rate: int
+    hydration_status: Optional[str] = "optimal"  # optimal, moderate, dehydrated
+    yesterday_training_load: float
+
+
+class RecoveryResponse(BaseModel):
+    """Recovery analysis and workout adjustment."""
+    user_id: str
+    recovery_score: float  # 0-100
+    recovery_status: str  # green, yellow, red
+    workout_modifier: float  # 0.5 - 1.5
+    recommendation: str
+
+
+# ================================================================
+# Ghost Social Racing (Feature 3)
+# ================================================================
+
+class ActivityPoint(BaseModel):
+    time_s: int
+    dist_m: float
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+
+class GhostMatchRequest(BaseModel):
+    """Request to find ghost position relative to user."""
+    user_elapsed_s: int
+    user_dist_m: float
+    ghost_stream: List[ActivityPoint]
+
+
+class GhostStatusResponse(BaseModel):
+    """Real-time gap analysis."""
+    ghost_dist_m: float
+    gap_m: float
+    status: str  # "ahead", "behind", "finished"
+    predicted_finish_gap_s: Optional[float] = None
+
+
+class RouteSegment(BaseModel):
+    id: str
+    name: str
+    distance_m: float
+    elevation_gain_m: float
+    surface_type: str  # asphalt, trail, gravel
+
+
+class RiskAwareRouteRequest(BaseModel):
+    user_id: str
+    gait_fatigue_score: float  # 0-100 from TFLite model
+    target_distance_m: float
+    candidate_segments: List[RouteSegment]
+
+
+class RiskAwareRouteResponse(BaseModel):
+    selected_route_id: str
+    risk_level: str
+    reasoning: str
+    safety_modifier_applied: bool
+
+
+class ActivitySummaryRequest(BaseModel):
+    user_id: str
+    distance_km: float
+    duration_mins: float
+    avg_hr: int
+    calories: int
+    intensity_score: float
+
+
+class ActivitySummaryResponse(BaseModel):
+    summary: str
+    impact_on_goal: str
+    suggested_rest_hours: int
+    stiffness_index: Optional[float] = None
+    knee_flexion: Optional[float] = None
+
+
+class GaitAdvancedRequest(BaseModel):
+    ground_contact_time_ms: float
+    vertical_oscillation_cm: float
+    cadence_spm: int
+    forward_lean_degrees: float
+    hip_drop_degrees: float
+    stiffness_index: float
+    peak_knee_flexion: float
+
+
 # ================================================================
 # Health Check
 # ================================================================
@@ -268,6 +362,235 @@ async def analyze_training_load(request: TrainingLoadRequest):
         training_status=status,
         recommendation=recommendation,
     )
+
+
+# ================================================================
+# Recovery Engine (Feature 1)
+# ================================================================
+
+@app.post("/api/v1/recovery/analyze", response_model=RecoveryResponse)
+async def analyze_recovery(request: RecoveryRequest):
+    """
+    Agentic Recovery Sync: Adjust training load based on bio-metrics.
+    
+    Synthesizes HRV, Sleep, RHR, and Hydration into a workout multiplier.
+    """
+    # Baseline Score (0-100)
+    score = 0.0
+    
+    # 1. HRV RMSSD (Higher is usually better)
+    # Target range typically 40-100ms for active adults
+    if request.hrv_rmssd >= 60: score += 30
+    elif request.hrv_rmssd >= 40: score += 20
+    elif request.hrv_rmssd >= 25: score += 10
+    
+    # 2. Sleep Score (Direct 0-100 weighting)
+    score += (request.sleep_score * 0.3)
+    
+    # 3. Resting HR (Lower is better recovery)
+    if request.resting_heart_rate < 50: score += 20
+    elif request.resting_heart_rate < 60: score += 15
+    elif request.resting_heart_rate < 70: score += 5
+    
+    # 4. Hydration Penalty
+    hydration_mult = 1.0
+    if request.hydration_status == "dehydrated":
+        score -= 20
+        hydration_mult = 0.8
+    elif request.hydration_status == "moderate":
+        score -= 10
+        hydration_mult = 0.9
+        
+    # Cap score
+    score = max(0, min(100, score))
+    
+    # Calculate Modifier (0.5 to 1.5)
+    # Sweet spot is 1.0 at score 70.
+    modifier = (score / 70.0) * hydration_mult
+    modifier = max(0.5, min(1.5, round(modifier, 2)))
+    
+    # Interpretation
+    if score >= 80:
+        status = "green"
+        rec = "You are primed for a high-intensity session. Go for those intervals!"
+    elif score >= 50:
+        status = "yellow"
+        rec = "Balanced recovery. Stick to your planned intensity but monitor fatigue."
+    else:
+        status = "red"
+        rec = "Recovery is compromised. Consider a low-intensity recovery run or rest day."
+        if request.hydration_status == "dehydrated":
+            rec += " Priority: Increase fluid and electrolyte intake immediately."
+
+    return RecoveryResponse(
+        user_id=request.user_id,
+        recovery_score=round(score, 1),
+        recovery_status=status,
+        workout_modifier=modifier,
+        recommendation=rec
+    )
+
+
+# ================================================================
+# Ghost Social Racing Engine (Feature 3)
+# ================================================================
+
+@app.post("/api/v1/ghost/sync", response_model=GhostStatusResponse)
+async def sync_ghost_position(request: GhostMatchRequest):
+    """
+    Interpolate friend's position at the user's current elapsed time.
+    
+    Returns the gap (meters) and status relative to the 'Ghost'.
+    """
+    if not request.ghost_stream:
+        raise HTTPException(status_code=400, detail="Ghost stream is empty")
+
+    stream = sorted(request.ghost_stream, key=lambda p: p.time_s)
+    user_time = request.user_elapsed_s
+    
+    # Check if ghost is finished
+    if user_time >= stream[-1].time_s:
+        ghost_dist = stream[-1].dist_m
+        status = "finished"
+    else:
+        # Linear Interpolation
+        p1 = stream[0]
+        p2 = stream[-1]
+        
+        # Find the bounding interval
+        for i in range(len(stream) - 1):
+            if stream[i].time_s <= user_time < stream[i+1].time_s:
+                p1 = stream[i]
+                p2 = stream[i+1]
+                break
+        
+        if p2.time_s == p1.time_s:
+            ghost_dist = p1.dist_m
+        else:
+            # Interpolation formula
+            time_ratio = (user_time - p1.time_s) / (p2.time_s - p1.time_s)
+            ghost_dist = p1.dist_m + time_ratio * (p2.dist_m - p1.dist_m)
+        
+        status = "ahead" if ghost_dist > request.user_dist_m else "behind"
+
+    gap = ghost_dist - request.user_dist_m
+    
+    return GhostStatusResponse(
+        ghost_dist_m=round(ghost_dist, 1),
+        gap_m=round(gap, 1),
+        status=status
+    )
+
+
+# ================================================================
+# Dynamic Risk-Aware Routing (Feature 3)
+# ================================================================
+
+@app.post("/api/v1/routing/analyze", response_model=RiskAwareRouteResponse)
+async def analyze_route_risk(request: RiskAwareRouteRequest):
+    """
+    Live route synthesis based on gait fatigue.
+    
+    Weights gradients and surface types based on real-time fatigue scores.
+    High fatigue (> 70) triggers 'Flat & Smooth' routing preference.
+    """
+    if not request.candidate_segments:
+        raise HTTPException(status_code=400, detail="No candidate segments provided")
+
+    best_segment = None
+    min_penalty = float('inf')
+    is_high_risk = request.gait_fatigue_score > 70
+    
+    for seg in request.candidate_segments:
+        # Base Penalty: Distance deviation from target
+        penalty = abs(seg.distance_m - request.target_distance_m) * 0.1
+        
+        # Fatigue-Based Elevation Penalty
+        # If fatigue is high, elevation gain is penalized heavily (4x)
+        elevation_weight = 4.0 if is_high_risk else 1.0
+        penalty += (seg.elevation_gain_m * elevation_weight)
+        
+        # Surface Penalty
+        if is_high_risk:
+            if seg.surface_type == "trail": penalty += 100  # Trails are unstable for fatigued legs
+            if seg.surface_type == "asphalt": penalty -= 50  # Asphalt is predictable
+            
+        if penalty < min_penalty:
+            min_penalty = penalty
+            best_segment = seg
+
+    risk_level = "high" if is_high_risk else "low"
+    reasoning = (
+        f"Gait fatigue is {request.gait_fatigue_score}%. "
+        f"Selected '{best_segment.name}' to minimize impact/elevation stress."
+    )
+    if is_high_risk:
+        reasoning += " System prioritized flat, stable surfaces (Asphalt) over hilly/trail routes."
+
+    return RiskAwareRouteResponse(
+        selected_route_id=best_segment.id,
+        risk_level=risk_level,
+        reasoning=reasoning,
+        safety_modifier_applied=is_high_risk
+    )
+
+
+# ================================================================
+# Autonomous Training Lifecycle (Feature 4)
+# ================================================================
+
+@app.post("/api/v1/lifecycle/summarize", response_model=ActivitySummaryResponse)
+async def summarize_activity(request: ActivitySummaryRequest):
+    """
+    Summarize activity impact on training goals.
+    """
+    intensity = "low" if request.intensity_score < 4 else "moderate" if request.intensity_score < 7 else "high"
+    
+    summary = (
+        f"Solid {request.distance_km}km run. "
+        f"You maintained an average HR of {request.avg_hr} bpm over {request.duration_mins} minutes, "
+        f"burning approximately {request.calories} calories."
+    )
+    
+    impact = (
+        f"This {intensity} intensity session contributes to your aerobic base. "
+        "You're 12% closer to your monthly distance goal."
+    )
+    
+    rest = int(request.intensity_score * 4) # Simple heuristic: 4h rest per intensity point
+    
+    return ActivitySummaryResponse(
+        summary=summary,
+        impact_on_goal=impact,
+        suggested_rest_hours=rest,
+        stiffness_index=None,
+        knee_flexion=None
+    )
+
+
+@app.post("/api/v1/gait/analyze-advanced")
+async def analyze_gait_advanced(request: GaitAdvancedRequest):
+    """
+    Advanced Gait Biomechanics Analysis.
+    Interpret new metrics: Stiffness and Knee Flexion.
+    """
+    verdict = "Optimal"
+    advice = "Maintain current form."
+    
+    if request.stiffness_index < 3.0:
+        verdict = "Low Elasticity"
+        advice = "Focus on plyometric drills (pogo jumps) to improve stiffness."
+    
+    if request.peak_knee_flexion < 158:
+        verdict = "Excessive Flexion"
+        advice = "Strengthen quads and focus on a 'tall' posture to prevent knee collapse."
+        
+    return {
+        "verdict": verdict,
+        "advice": advice,
+        "stiffness_score": round(request.stiffness_index, 2),
+        "flexion_score": round(request.peak_knee_flexion, 1)
+    }
 
 
 # ================================================================

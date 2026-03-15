@@ -41,6 +41,8 @@ class GaitMetricsCalculator {
   final List<double> _strideLengths = [];
   final List<int> _stepTimestamps = [];
   final List<double> _hipYHistory = [];
+  final List<double> _kneeFlexionHistory = [];
+  final List<double> _verticalStiffnessHistory = [];
 
   // Track left/right foot contact separately for better step detection
   bool _leftFootDown = false;
@@ -86,6 +88,9 @@ class GaitMetricsCalculator {
 
     // ── Track vertical oscillation ─────────────────────────
     _trackVerticalOscillation(curr);
+
+    // ── Track knee flexion ─────────────────────────────────
+    _trackKneeFlexion(curr);
   }
 
   /// Improved ground contact detection using velocity reversal
@@ -155,6 +160,60 @@ class GaitMetricsCalculator {
 
     // Keep history bounded
     if (_hipYHistory.length > 200) _hipYHistory.removeAt(0);
+  }
+
+  /// Track knee flexion at peak stance
+  void _trackKneeFlexion(_PoseFrame frame) {
+    // We only care about knee flexion when a foot is down (stance phase)
+    if (!_leftFootDown && !_rightFootDown) return;
+
+    final side = _leftFootDown ? 'left' : 'right';
+    final hip = side == 'left' ? leftHip : rightHip;
+    final knee = side == 'left' ? leftKnee : rightKnee;
+    final ankle = side == 'left' ? leftAnkle : rightAnkle;
+
+    final h = frame.landmarks[hip];
+    final k = frame.landmarks[knee];
+    final a = frame.landmarks[ankle];
+
+    // Angle at knee using law of cosines (or atan2 vector difference)
+    final v1x = h.x - k.x;
+    final v1y = h.y - k.y;
+    final v2x = a.x - k.x;
+    final v2y = a.y - k.y;
+
+    final dot = v1x * v2x + v1y * v2y;
+    final mag1 = math.sqrt(v1x * v1x + v1y * v1y);
+    final mag2 = math.sqrt(v2x * v2x + v2y * v2y);
+
+    if (mag1 > 0 && mag2 > 0) {
+      final angleRad = math.acos((dot / (mag1 * mag2)).clamp(-1.0, 1.0));
+      final angleDeg = angleRad * 180 / math.pi;
+      _kneeFlexionHistory.add(angleDeg);
+    }
+
+    if (_kneeFlexionHistory.length > 100) _kneeFlexionHistory.removeAt(0);
+  }
+
+  /// Calculate peak knee flexion during stance
+  /// Optimal: 160-170 degrees (where 180 is straight)
+  double calculatePeakKneeFlexion() {
+    if (_kneeFlexionHistory.isEmpty) return 180.0;
+    // We want the MINIMUM angle (maximum flexion)
+    return _kneeFlexionHistory.reduce(math.min);
+  }
+
+  /// Calculate Vertical Stiffness (kN/m proxy)
+  /// Formula: Stiffness = Peak Ground Reaction Force / Peak Center of Mass Displacement
+  /// Proxy: 1 / (GCT * VertOscillation)
+  double calculateStiffnessIndex() {
+    final gct = calculateGroundContactTimeMs() / 1000.0; // seconds
+    final osc = calculateVerticalOscillationCm() / 100.0; // meters
+    if (gct == 0 || osc == 0) return 0;
+
+    // Simplified athletic stiffness index
+    final index = 1.0 / (gct * osc);
+    return (index / 10.0).clamp(0.0, 10.0);
   }
 
   /// Calculate the average Ground Contact Time in milliseconds
@@ -452,6 +511,13 @@ class GaitMetricsCalculator {
     } else if (armSym >= 0.8) score += 5;
     else if (armSym >= 0.7) score += 3;
 
+    final kneeFlex = calculatePeakKneeFlexion();
+    if (kneeFlex < 172 && kneeFlex > 158) {
+      score += 5;
+    } else if (kneeFlex < 158) {
+      score -= 5; // Over-flexing/Collapsing
+    }
+
     return score.clamp(0, 100);
   }
 
@@ -506,6 +572,18 @@ class GaitMetricsCalculator {
           'Heel striking detected. Try landing with feet under your center of mass.');
     }
 
+    final stiffness = calculateStiffnessIndex();
+    if (stiffness > 0 && stiffness < 3.5) {
+      tips.add(
+          'Low vertical stiffness. Imagine running on hot coals to decrease ground contact time.');
+    }
+
+    final kneeFlex = calculatePeakKneeFlexion();
+    if (kneeFlex < 155) {
+      tips.add(
+          'Excessive knee collapse detected (${kneeFlex.toStringAsFixed(1)}°). Focus on "stiff" legs and eccentric quad strength.');
+    }
+
     if (tips.isEmpty) {
       tips.add('Excellent running form! Maintain consistency and focus on gradual progression.');
     }
@@ -536,6 +614,8 @@ class GaitMetricsCalculator {
     _strideLengths.clear();
     _stepTimestamps.clear();
     _hipYHistory.clear();
+    _kneeFlexionHistory.clear();
+    _verticalStiffnessHistory.clear();
     _leftFootDown = false;
     _rightFootDown = false;
     _lastLeftContactMs = 0;

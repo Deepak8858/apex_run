@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/planned_workout.dart';
+import '../../ml/ml_providers.dart';
+import '../../ml/agent_service.dart';
 import '../providers/app_providers.dart';
 import 'form_analysis_screen.dart';
 
@@ -74,6 +76,10 @@ class CoachScreen extends ConsumerWidget {
                 _InsightCard(insight: coachState.coachingInsight!),
                 const SizedBox(height: 24),
               ],
+
+              // Agentic Recovery Sync (Feature 1)
+              const _AgenticRecoveryCard(),
+              const SizedBox(height: 24),
 
               // Today's Workout
               Text("Today's Workout",
@@ -1061,6 +1067,178 @@ class _FormAnalysisEntryCard extends StatelessWidget {
 // ============================================================
 // Detail Stat Box (for workout detail bottom sheet)
 // ============================================================
+
+    );
+  }
+}
+
+// ============================================================
+// Agentic Recovery Card
+// ============================================================
+
+class _AgenticRecoveryCard extends ConsumerWidget {
+  const _AgenticRecoveryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hrvAsync = ref.watch(todaysHrvProvider);
+
+    return hrvAsync.when(
+      data: (hrv) {
+        if (hrv == null) return const SizedBox.shrink();
+
+        final request = RecoveryRequest(
+          userId: 'deepak_01', // Mock for now, would pull from profile
+          hrvRmssd: hrv.rmssd,
+          sleepScore: hrv.sleepQualityScore ?? 80,
+          restingHeartRate: hrv.restingHeartRate,
+          yesterdayTrainingLoad: 150.0, // Mock
+        );
+
+        final recoveryAsync = ref.watch(recoveryAnalysisProvider(request));
+
+        return recoveryAsync.when(
+          data: (analysis) {
+            if (analysis == null) return const SizedBox.shrink();
+
+            final statusColor = _getStatusColor(analysis.recoveryStatus);
+
+            return Container(
+              decoration: BoxDecoration(
+                color: AppTheme.cardBackground,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.sync_rounded, color: statusColor, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AGENTIC RECOVERY SYNC',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.0,
+                                ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${analysis.recoveryScore.toInt()}%',
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Workout Modifier: ${analysis.workoutModifier}x',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              analysis.recommendation,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      _ModifierCircle(
+                        modifier: analysis.workoutModifier,
+                        color: statusColor,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+          loading: () => const _LoadingCard(),
+          error: (e, _) => const SizedBox.shrink(),
+        );
+      },
+      loading: () => const _LoadingCard(),
+      error: (e, _) => const SizedBox.shrink(),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'green':
+        return AppTheme.success;
+      case 'yellow':
+        return AppTheme.warning;
+      case 'red':
+        return AppTheme.error;
+      default:
+        return AppTheme.textSecondary;
+    }
+  }
+}
+
+class _ModifierCircle extends StatelessWidget {
+  final double modifier;
+  final Color color;
+
+  const _ModifierCircle({required this.modifier, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 3),
+      ),
+      child: Center(
+        child: Text(
+          '${(modifier * 100).toInt()}%',
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _DetailStatBox extends StatelessWidget {
   final IconData icon;

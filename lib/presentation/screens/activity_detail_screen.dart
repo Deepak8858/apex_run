@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/gps_utils.dart';
 import '../../domain/models/activity.dart';
+import '../../ml/agent_service.dart';
+import '../../ml/ml_providers.dart';
 import '../widgets/route_map_widget.dart';
 import '../widgets/activity_charts.dart';
+import '../widgets/goal_impact_card.dart';
 import '../providers/app_providers.dart';
 
 /// Activity Detail Screen — Phase 4e
@@ -114,6 +117,16 @@ class ActivityDetailScreen extends ConsumerWidget {
 
                   // Key metrics grid
                   _MetricsGrid(activity: activity),
+
+                  const SizedBox(height: 24),
+
+                  // Goal Impact Card
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final summary = ref.watch(mockGoalImpactProvider);
+                      return GoalImpactCard(summary: summary);
+                    },
+                  ),
 
                   const SizedBox(height: 24),
 

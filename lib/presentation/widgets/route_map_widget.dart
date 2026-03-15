@@ -43,6 +43,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   PolylineAnnotationManager? _polylineManager;
   PolylineAnnotationManager? _glowManager;
   PointAnnotationManager? _pointManager;
+  PolylineAnnotation? _mainLine;
+  PolylineAnnotation? _glowLine;
   Timer? _animTimer;
   int _animIndex = 0;
 
@@ -113,6 +115,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     super.didUpdateWidget(oldWidget);
     if (widget.styleUri != oldWidget.styleUri) {
       _mapboxMap?.loadStyleURI(widget.styleUri);
+      _mainLine = null;
+      _glowLine = null;
       // Ensure annotations are redrawn after style change as they might be cleared or hidden
       Future.delayed(const Duration(milliseconds: 500), () => _drawRoute());
     }
@@ -180,31 +184,38 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   Future<void> _drawRoute() async {
     if (_polylineManager == null || widget.routePoints.length < 2) return;
 
-    // Clear existing annotations
-    await _polylineManager!.deleteAll();
-    await _glowManager?.deleteAll();
-    await _pointManager?.deleteAll();
-
-    // Draw polyline
     final coordinates = widget.routePoints
         .map((p) => Position(p.longitude, p.latitude))
         .toList();
+    final geometry = LineString(coordinates: coordinates);
 
-    // Outer glow line (Strava-style neon effect)
-    await _glowManager?.create(PolylineAnnotationOptions(
-      geometry: LineString(coordinates: coordinates),
-      lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
-      lineWidth: 10.0,
-      lineOpacity: 0.4,
-    ));
+    // Optimized Update Pattern: 
+    // Instead of deleteAll(), we update the existing annotation geometry.
+    // This is significantly more performant for long activities.
+    if (_mainLine != null && _glowLine != null) {
+      _mainLine!.geometry = geometry;
+      _glowLine!.geometry = geometry;
+      await _polylineManager!.update(_mainLine!);
+      await _glowManager!.update(_glowLine!);
+    } else {
+      // First time draw or after style change
+      await _polylineManager!.deleteAll();
+      await _glowManager!.deleteAll();
 
-    // Main route line
-    await _polylineManager!.create(PolylineAnnotationOptions(
-      geometry: LineString(coordinates: coordinates),
-      lineColor: AppTheme.electricLime.toARGB32(),
-      lineWidth: 4.0,
-      lineOpacity: 0.95,
-    ));
+      _glowLine = await _glowManager?.create(PolylineAnnotationOptions(
+        geometry: geometry,
+        lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
+        lineWidth: 10.0,
+        lineOpacity: 0.4,
+      ));
+
+      _mainLine = await _polylineManager!.create(PolylineAnnotationOptions(
+        geometry: geometry,
+        lineColor: AppTheme.electricLime.toARGB32(),
+        lineWidth: 4.0,
+        lineOpacity: 0.95,
+      ));
+    }
 
     _drawMarkers();
 
