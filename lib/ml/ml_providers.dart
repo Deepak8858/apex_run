@@ -262,9 +262,7 @@ final routeRiskProvider =
 // ============================================================
 // Mock Providers for UI Integration
 // ============================================================
-final mockGhostStatusProvider = StateProvider<GhostStatusResponse?>((ref) => GhostStatusResponse(
-  ghostDistM: 1200, gapM: -15.5, status: 'racing'
-));
+// Removed mockGhostStatusProvider in favor of ghostRacingControllerProvider
 
 final mockRouteRiskProvider = StateProvider<RiskAwareRouteResponse?>((ref) => RiskAwareRouteResponse(
   selectedRouteId: 'r1', riskLevel: 'High', reasoning: 'High fatigue detected. Modifying route to avoid steep descents.', safetyModifierApplied: true

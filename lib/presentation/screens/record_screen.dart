@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/permission_utils.dart';
 import '../../domain/models/tracking_metrics.dart';
 import '../providers/tracking_provider.dart';
+import '../../ml/ghost_racing_controller.dart';
 import '../../ml/ml_providers.dart';
 import '../../ml/agent_service.dart';
 import '../widgets/route_map_widget.dart';
@@ -433,7 +434,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                     const SizedBox(height: 4),
                     Consumer(
                       builder: (context, ref, _) {
-                        final ghost = ref.watch(mockGhostStatusProvider);
+                        final ghost = ref.watch(ghostRacingControllerProvider);
                         return GhostRacingOverlay(ghostStatus: ghost);
                       },
                     ),
@@ -573,6 +574,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           _FinishButton(
             onFinish: () {
               HapticFeedback.heavyImpact();
+              ref.read(selectedGhostActivityProvider.notifier).state = null;
               ref.read(trackingControllerProvider.notifier).stopAndSaveTracking();
             },
           ),
@@ -700,6 +702,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
+              ref.read(selectedGhostActivityProvider.notifier).state = null;
               ref.read(trackingControllerProvider.notifier).discardTracking();
             },
             child: const Text('Discard', style: TextStyle(color: AppTheme.error)),
@@ -879,17 +882,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                                 color: AppTheme.electricLime),
                           ),
                           title: Text(
-                            act.name,
+                            act.activityName,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           subtitle: Text(
                             '${act.formattedDistance} • ${act.formattedDuration}',
                           ),
                           onTap: () {
+                            ref.read(selectedGhostActivityProvider.notifier).state = act;
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Racing against ${act.name}! 👻'),
+                                content: Text('Racing against ${act.activityName}! 👻'),
                                 backgroundColor: AppTheme.electricLime,
                                 behavior: SnackBarBehavior.floating,
                               ),
