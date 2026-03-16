@@ -43,7 +43,7 @@ func TestCreateActivityRequest_Validation(t *testing.T) {
 				"duration_seconds": 1800,
 				"distance_meters": 5000
 			}`,
-			expectCode: http.StatusBadRequest, // Will be 400 since no repo
+			expectCode: http.StatusOK,
 		},
 		{
 			name: "missing activity_name",
