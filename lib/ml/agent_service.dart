@@ -270,14 +270,17 @@ class AgentService {
   Future<void> initialize() async {
     if (_initialized) return;
 
+    final String baseUrl = Env.enableEdgeFunctions ? '${Env.supabaseUrl}/functions/v1' : Env.mlServiceUrl;
+
     _dio = Dio(
       BaseOptions(
-        baseUrl: Env.mlServiceUrl,
+        baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 20),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          if (Env.enableEdgeFunctions) 'Authorization': 'Bearer ${Env.supabaseAnonKey}',
         },
       ),
     );
@@ -287,8 +290,9 @@ class AgentService {
   /// Feature 1: Agentic Recovery Sync
   Future<RecoveryResponse?> analyzeRecovery(RecoveryRequest request) async {
     try {
+      final String path = Env.enableEdgeFunctions ? '/recovery-analyze' : '/api/v1/recovery/analyze';
       final response = await _dio.post(
-        '/api/v1/recovery/analyze',
+        path,
         data: request.toJson(),
       );
       if (response.statusCode == 200) {
@@ -303,8 +307,9 @@ class AgentService {
   /// Feature 2: Ghost Social Racing
   Future<GhostStatusResponse?> syncGhost(GhostMatchRequest request) async {
     try {
+      final String path = Env.enableEdgeFunctions ? '/ghost-sync' : '/api/v1/ghost/sync';
       final response = await _dio.post(
-        '/api/v1/ghost/sync',
+        path,
         data: request.toJson(),
       );
       if (response.statusCode == 200) {
@@ -319,8 +324,9 @@ class AgentService {
   /// Feature 3: Dynamic Risk-Aware Routing
   Future<RiskAwareRouteResponse?> analyzeRouteRisk(RiskAwareRouteRequest request) async {
     try {
+      final String path = Env.enableEdgeFunctions ? '/routing-analyze' : '/api/v1/routing/analyze';
       final response = await _dio.post(
-        '/api/v1/routing/analyze',
+        path,
         data: request.toJson(),
       );
       if (response.statusCode == 200) {
@@ -335,8 +341,9 @@ class AgentService {
   /// Feature 4: Autonomous Training Lifecycle
   Future<ActivitySummaryResponse?> summarizeActivity(ActivitySummaryRequest request) async {
     try {
+      final String path = Env.enableEdgeFunctions ? '/lifecycle-summarize' : '/api/v1/lifecycle/summarize';
       final response = await _dio.post(
-        '/api/v1/lifecycle/summarize',
+        path,
         data: request.toJson(),
       );
       if (response.statusCode == 200) {
@@ -351,8 +358,9 @@ class AgentService {
   /// Feature 5: Advanced Gait Biomechanics Analysis
   Future<Map<String, dynamic>?> analyzeGait(GaitInferenceRequest request) async {
     try {
+      final String path = Env.enableEdgeFunctions ? '/gait-analyze' : '/api/v1/gait/analyze-advanced';
       final response = await _dio.post(
-        '/api/v1/gait/analyze-advanced',
+        path,
         data: request.toJson(),
       );
       if (response.statusCode == 200) {

@@ -1,4 +1,1 @@
-hint: core.useBuiltinFSMonitor=true is deprecated;please set core.fsmonitor=true instead
-hint: Disable this message with "git config set advice.useCoreFSMonitorConfig false"
-hint: core.useBuiltinFSMonitor=true is deprecated;please set core.fsmonitor=true instead
-hint: Disable this message with "git config set advice.useCoreFSMonitorConfig false"
+./build_mobile.sh: line 13: flutter: command not found
