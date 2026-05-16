@@ -24,13 +24,13 @@ Digital Ocean App Platform will automatically build and deploy your Docker conta
 3. **Configure Environment Variables**
    In the App Platform dashboard, add these environment variables:
    ```
-   SUPABASE_URL=https://voddddmmiarnbvwmgzgo.supabase.co
-   SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   SUPABASE_URL=https://<YOUR_PROJECT_REF>.supabase.co
+   SUPABASE_ANON_KEY=<REPLACE_WITH_ROTATED_ANON_KEY>
    SUPABASE_SERVICE_KEY=<your-service-role-key>
    SUPABASE_JWT_SECRET=<your-jwt-secret>
-   DATABASE_URL=postgresql://postgres:<password>@db.voddddmmiarnbvwmgzgo.supabase.co:5432/postgres
-   REDIS_URL=134.199.187.2:6379
-   REDIS_PASSWORD=Dream@885890
+   DATABASE_URL=postgresql://postgres:<password>@db.<YOUR_PROJECT_REF>.supabase.co:5432/postgres
+   REDIS_URL=<REDIS_HOST>:6379
+   REDIS_PASSWORD=<REPLACE_WITH_ROTATED_REDIS_PASSWORD>
    REDIS_DB=0
    PORT=8080
    GIN_MODE=release
@@ -103,13 +103,13 @@ nano .env
 Paste this configuration (update with your actual credentials):
 
 ```env
-SUPABASE_URL=https://voddddmmiarnbvwmgzgo.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZGRkZG1taWFybmJ2d21nemdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NTE3OTcsImV4cCI6MjA4NjIyNzc5N30.i7Ni-NHsmbwaXEoyOut_26PH1PK_Xycw3ChzkvPtklM
+SUPABASE_URL=https://<YOUR_PROJECT_REF>.supabase.co
+SUPABASE_ANON_KEY=<REPLACE_WITH_ROTATED_ANON_KEY>
 SUPABASE_SERVICE_KEY=<YOUR_SERVICE_ROLE_KEY_HERE>
 SUPABASE_JWT_SECRET=<YOUR_JWT_SECRET_FROM_SUPABASE_SETTINGS>
-DATABASE_URL=postgresql://postgres:<PASSWORD>@db.voddddmmiarnbvwmgzgo.supabase.co:5432/postgres
-REDIS_URL=134.199.187.2:6379
-REDIS_PASSWORD=Dream@885890
+DATABASE_URL=postgresql://postgres:<PASSWORD>@db.<YOUR_PROJECT_REF>.supabase.co:5432/postgres
+REDIS_URL=<REDIS_HOST>:6379
+REDIS_PASSWORD=<REPLACE_WITH_ROTATED_REDIS_PASSWORD>
 REDIS_DB=0
 PORT=8080
 GIN_MODE=release
@@ -280,13 +280,13 @@ curl http://localhost:8080/health
 ### Database connection issues
 ```bash
 # Test DB connection from droplet
-psql "postgresql://postgres:<PASSWORD>@db.voddddmmiarnbvwmgzgo.supabase.co:5432/postgres"
+psql "postgresql://postgres:<PASSWORD>@db.<YOUR_PROJECT_REF>.supabase.co:5432/postgres"
 ```
 
 ### Redis connection issues
 ```bash
 # Test Redis connection
-redis-cli -h 134.199.187.2 -p 6379 -a Dream@885890 ping
+redis-cli -h "$REDIS_HOST" -p 6379 -a "$REDIS_PASSWORD" ping  # read from env
 ```
 
 ---

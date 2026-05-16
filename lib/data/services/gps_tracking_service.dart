@@ -245,6 +245,11 @@ class GpsTrackingService {
   }
 
   void _emitMetrics() {
+    _lastMetrics = _computeMetrics();
+    _metricsController.add(_lastMetrics);
+  }
+
+  TrackingMetrics _computeMetrics() {
     final filteredPoints = GpsUtils.filterByAccuracy(
       _recordedPoints,
       Env.gpsAccuracyThresholdMeters.toDouble(),
@@ -257,13 +262,19 @@ class GpsTrackingService {
         ? filteredPoints.last.speed * 3.6
         : 0.0;
 
-    _metricsController.add(TrackingMetrics(
+    return TrackingMetrics(
       distanceMeters: distance,
       durationSeconds: duration,
       currentPaceMinPerKm: pace,
       currentSpeedKmh: speed,
       routePoints: List.from(_recordedPoints),
       state: _state,
-    ));
+    );
   }
+
+  TrackingMetrics _lastMetrics = const TrackingMetrics();
+
+  /// Latest metrics snapshot — useful at stop time for post-run summary
+  /// without subscribing to the stream.
+  TrackingMetrics get currentMetrics => _lastMetrics;
 }

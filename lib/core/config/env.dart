@@ -1,196 +1,155 @@
 /// Environment Configuration for ApexRun
 ///
-/// This file contains environment-specific configuration values.
-/// Credentials should be passed via --dart-define flags or environment variables.
+/// ALL VALUES MUST BE INJECTED AT BUILD TIME via `--dart-define` or
+/// `--dart-define-from-file=.env.json`. NEVER hardcode credentials here.
+///
+/// Example:
+///   flutter run \
+///     --dart-define-from-file=.env.json
+///
+/// Or per-flag:
+///   flutter run \
+///     --dart-define=SUPABASE_URL=https://xxx.supabase.co \
+///     --dart-define=SUPABASE_ANON_KEY=eyJ...
+///
+/// See `.env.example.json` for the full list of required variables.
+/// See `SECURITY_ROTATION.md` for the credential rotation playbook.
 class Env {
   // ── Supabase Configuration ──────────────────────────────────────────
-  static const String supabaseUrl = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://voddddmmiarnbvwmgzgo.supabase.co',
-  );
+  static const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  static const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZGRkZG1taWFybmJ2d21nemdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NTE3OTcsImV4cCI6MjA4NjIyNzc5N30.i7Ni-NHsmbwaXEoyOut_26PH1PK_Xycw3ChzkvPtklM',
-  );
-
-  static const String supabaseServiceKey = String.fromEnvironment(
-    'SUPABASE_SERVICE_KEY',
-    defaultValue: '',
-  );
+  /// Service role key. NEVER ship in client builds. Reserved for CI / Edge Functions.
+  static const String supabaseServiceKey = String.fromEnvironment('SUPABASE_SERVICE_KEY');
 
   // ── Mapbox Configuration ────────────────────────────────────────────
-  static const String mapboxAccessToken = String.fromEnvironment(
-    'MAPBOX_ACCESS_TOKEN',
-    defaultValue: 'pk.eyJ1IjoiZGVlcGFrNzIzOCIsImEiOiJjbWxnZjAwMTMwOWo5M2xzaHF3eTd1eTd6In0.cNbgPuE749GMnCztExzPgg',
-  );
-
+  static const String mapboxAccessToken = String.fromEnvironment('MAPBOX_ACCESS_TOKEN');
   static const String mapboxStyleUrl = String.fromEnvironment(
     'MAPBOX_STYLE_URL',
-    defaultValue: 'mapbox://styles/deepak7238/cmlgf5u11002901s73tdc1xk9',
+    defaultValue: 'mapbox://styles/mapbox/dark-v11',
   );
 
   // ── Backend API Configuration ───────────────────────────────────────
-  static const String backendApiUrl = String.fromEnvironment(
-    'BACKEND_API_URL',
-    defaultValue: 'https://api.devdeepak.me',
-  );
+  static const String backendApiUrl = String.fromEnvironment('BACKEND_API_URL');
+  static const String mlServiceUrl = String.fromEnvironment('ML_SERVICE_URL');
 
-  // ── ML Service Configuration ────────────────────────────────────────
-  static const String mlServiceUrl = String.fromEnvironment(
-    'ML_SERVICE_URL',
-    defaultValue: 'https://api.devdeepak.me',
-  );
-
-  // ── Google Cloud / Gemini Configuration ─────────────────────────────
-  static const String geminiApiKey = String.fromEnvironment(
-    'GEMINI_API_KEY',
-    defaultValue: 'AQ.Ab8RN6JLx52aNNnmEVb6IoVrkCrsN5Hq3XKUW3hRn2gRKaxHyQ',
-  );
-
-  // ── Google Sign-In Configuration ───────────────────────────────────
-  /// Web Client ID from Google Cloud Console (OAuth 2.0 Client Credentials)
-  /// This must match the Web Client ID configured in Supabase Auth → Google provider.
-  /// Pass via --dart-define=GOOGLE_WEB_CLIENT_ID=your-id.apps.googleusercontent.com
-  static const String googleWebClientId = String.fromEnvironment(
-    'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '8211368554-j0apr7p6i3s6adtauhs4ogps8v288ii4.apps.googleusercontent.com',
-  );
-
-  /// iOS Client ID from Google Cloud Console (OAuth 2.0 Client Credentials)
-  /// Required for native Google Sign-In on iOS.
-  /// Pass via --dart-define=GOOGLE_IOS_CLIENT_ID=your-id.apps.googleusercontent.com
-  static const String googleIosClientId = String.fromEnvironment(
-    'GOOGLE_IOS_CLIENT_ID',
-    defaultValue: '',
-  );
-
+  // ── Gemini Configuration ────────────────────────────────────────────
+  /// Gemini API key lives ONLY in Supabase Edge Function secrets. The client
+  /// never holds it. `enableAiCoaching` toggles whether the client attempts
+  /// to call AI Edge Functions at all (rule-based fallback otherwise).
   static const String geminiModel = String.fromEnvironment(
     'GEMINI_MODEL',
     defaultValue: 'gemini-2.0-flash',
   );
 
-  // ── Redis Configuration (for direct client access if needed) ────────
-  static const String redisUrl = String.fromEnvironment(
-    'REDIS_URL',
-    defaultValue: '134.199.187.2:6379',
-  );
+  // ── Google Sign-In Configuration ───────────────────────────────────
+  /// Web Client ID from Google Cloud Console.
+  /// Must match the Web Client ID configured in Supabase Auth → Google provider.
+  static const String googleWebClientId = String.fromEnvironment('GOOGLE_WEB_CLIENT_ID');
 
-  static const String redisPassword = String.fromEnvironment(
-    'REDIS_PASSWORD',
-    defaultValue: 'Dream@885890',
-  );
+  /// iOS Client ID from Google Cloud Console (required for native Google Sign-In on iOS).
+  static const String googleIosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
+
+  // ── Redis Configuration ─────────────────────────────────────────────
+  /// DEPRECATED on client. Direct Redis access from the app is forbidden;
+  /// always route through the backend API. Kept only for legacy edge cases.
+  static const String redisUrl = String.fromEnvironment('REDIS_URL');
+  static const String redisPassword = String.fromEnvironment('REDIS_PASSWORD');
 
   // ── App Configuration ───────────────────────────────────────────────
   static const String appVersion = '1.0.0';
   static const String appName = 'ApexRun';
 
-  // ── Feature Flags (for gradual rollout) ─────────────────────────────
-  static const bool enableAiCoaching = bool.fromEnvironment(
-    'ENABLE_AI_COACHING',
-    defaultValue: true,
+  // ── Observability ───────────────────────────────────────────────────
+  static const String sentryDsn = String.fromEnvironment('SENTRY_DSN');
+  static const String sentryEnvironment = String.fromEnvironment(
+    'SENTRY_ENVIRONMENT',
+    defaultValue: 'development',
   );
+  static const double sentryTracesSampleRate = 0.1;
 
-  static const bool enableEdgeFunctions = bool.fromEnvironment(
-    'ENABLE_EDGE_FUNCTIONS',
-    defaultValue: true,
-  );
+  static bool get isSentryConfigured => sentryDsn.isNotEmpty;
 
-  static const bool enableFormAnalysis = bool.fromEnvironment(
-    'ENABLE_FORM_ANALYSIS',
-    defaultValue: true,
-  );
+  // ── RevenueCat ──────────────────────────────────────────────────────
+  /// Public API keys (platform-specific). RevenueCat docs:
+  ///   iOS:     appl_xxx
+  ///   Android: goog_xxx
+  /// These are safe to ship — entitlement enforcement happens server-side
+  /// via webhook → `public.subscriptions`.
+  static const String revenueCatIosKey = String.fromEnvironment('REVENUECAT_IOS_KEY');
+  static const String revenueCatAndroidKey = String.fromEnvironment('REVENUECAT_ANDROID_KEY');
 
-  static const bool enableSegmentLeaderboards = bool.fromEnvironment(
-    'ENABLE_SEGMENT_LEADERBOARDS',
-    defaultValue: true,
-  );
+  static bool get isRevenueCatConfigured =>
+      revenueCatIosKey.isNotEmpty || revenueCatAndroidKey.isNotEmpty;
 
-  static const bool enableBackgroundGps = bool.fromEnvironment(
-    'ENABLE_BACKGROUND_GPS',
-    defaultValue: true,
-  );
+  // ── Certificate Pinning ─────────────────────────────────────────────
+  /// Comma-separated list of SHA-256 fingerprints (base64) for the backend
+  /// API certificate chain. Get via:
+  ///   openssl s_client -servername api.example.com -connect api.example.com:443 \
+  ///     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform DER \
+  ///     | openssl dgst -sha256 -binary | openssl enc -base64
+  static const String backendCertSha256Fingerprints =
+      String.fromEnvironment('BACKEND_CERT_SHA256_FINGERPRINTS');
 
-  static const bool enablePrivacyShroud = bool.fromEnvironment(
-    'ENABLE_PRIVACY_SHROUD',
-    defaultValue: true,
-  );
+  // ── Feature Flags ───────────────────────────────────────────────────
+  static const bool enableAiCoaching = bool.fromEnvironment('ENABLE_AI_COACHING', defaultValue: true);
+  static const bool enableEdgeFunctions = bool.fromEnvironment('ENABLE_EDGE_FUNCTIONS', defaultValue: true);
+  static const bool enableFormAnalysis = bool.fromEnvironment('ENABLE_FORM_ANALYSIS', defaultValue: true);
+  static const bool enableSegmentLeaderboards = bool.fromEnvironment('ENABLE_SEGMENT_LEADERBOARDS', defaultValue: true);
+  static const bool enableBackgroundGps = bool.fromEnvironment('ENABLE_BACKGROUND_GPS', defaultValue: true);
+  static const bool enablePrivacyShroud = bool.fromEnvironment('ENABLE_PRIVACY_SHROUD', defaultValue: true);
 
   // ── GPS Configuration ───────────────────────────────────────────────
-  static const int gpsUpdateIntervalMs = int.fromEnvironment(
-    'GPS_UPDATE_INTERVAL_MS',
-    defaultValue: 1500,
-  );
-
-  static const int gpsAccuracyThresholdMeters = int.fromEnvironment(
-    'GPS_ACCURACY_THRESHOLD_METERS',
-    defaultValue: 20,
-  );
-
-  static const int gpsDistanceFilterMeters = int.fromEnvironment(
-    'GPS_DISTANCE_FILTER_METERS',
-    defaultValue: 5,
-  );
+  static const int gpsUpdateIntervalMs = int.fromEnvironment('GPS_UPDATE_INTERVAL_MS', defaultValue: 1500);
+  static const int gpsAccuracyThresholdMeters = int.fromEnvironment('GPS_ACCURACY_THRESHOLD_METERS', defaultValue: 20);
+  static const int gpsDistanceFilterMeters = int.fromEnvironment('GPS_DISTANCE_FILTER_METERS', defaultValue: 5);
 
   // ── Privacy Configuration ───────────────────────────────────────────
-  static const int homePrivacyRadiusMeters = int.fromEnvironment(
-    'HOME_PRIVACY_RADIUS_METERS',
-    defaultValue: 200,
-  );
+  static const int homePrivacyRadiusMeters = int.fromEnvironment('HOME_PRIVACY_RADIUS_METERS', defaultValue: 200);
 
-  /// Validate that all required environment variables are set
-  static bool get isConfigured {
-    return supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
-  }
+  // ── Validation ──────────────────────────────────────────────────────
 
-  /// Check if Mapbox is configured
+  /// All required secrets present.
+  static bool get isConfigured =>
+      supabaseUrl.isNotEmpty &&
+      supabaseAnonKey.isNotEmpty &&
+      mapboxAccessToken.isNotEmpty &&
+      googleWebClientId.isNotEmpty;
+
   static bool get isMapboxConfigured => mapboxAccessToken.isNotEmpty;
 
-  /// Check if Gemini AI is configured
-  static bool get isGeminiConfigured => geminiApiKey.isNotEmpty;
-
-  /// Get user-friendly error message for missing configuration
+  /// Human-readable list of any missing required vars.
   static String get configurationErrorMessage {
-    final List<String> missing = [];
+    final missing = <String>[];
+    if (supabaseUrl.isEmpty) missing.add('SUPABASE_URL');
+    if (supabaseAnonKey.isEmpty) missing.add('SUPABASE_ANON_KEY');
+    if (mapboxAccessToken.isEmpty) missing.add('MAPBOX_ACCESS_TOKEN');
+    if (googleWebClientId.isEmpty) missing.add('GOOGLE_WEB_CLIENT_ID');
 
-    if (supabaseUrl.isEmpty) {
-      missing.add('SUPABASE_URL');
-    }
-    if (supabaseAnonKey.isEmpty) {
-      missing.add('SUPABASE_ANON_KEY');
-    }
+    if (missing.isEmpty) return 'Configuration is valid';
 
-    if (missing.isEmpty) {
-      return 'Configuration is valid';
-    }
-
-    return 'Missing required environment variables: ${missing.join(', ')}\n\n'
-        'Please run with:\n'
-        'flutter run --dart-define=SUPABASE_URL=your_url '
-        '--dart-define=SUPABASE_ANON_KEY=your_key';
+    return 'Missing required environment variables:\n'
+        '  ${missing.join('\n  ')}\n\n'
+        'Provide them at build time:\n'
+        '  flutter run --dart-define-from-file=.env.json\n\n'
+        'See .env.example.json for the template.';
   }
 
-  /// Full list of all dart-define flags for reference
+  /// Reference for CI / developer onboarding.
   static String get dartDefineHelp => '''
+# Preferred: single-file injection
+flutter run --dart-define-from-file=.env.json
+
+# Or per-flag:
 flutter run \\
   --dart-define=SUPABASE_URL=https://xxx.supabase.co \\
   --dart-define=SUPABASE_ANON_KEY=eyJ... \\
-  --dart-define=SUPABASE_SERVICE_KEY=eyJ... \\
   --dart-define=MAPBOX_ACCESS_TOKEN=pk.eyJ... \\
+  --dart-define=GOOGLE_WEB_CLIENT_ID=xxx.apps.googleusercontent.com \\
+  --dart-define=GOOGLE_IOS_CLIENT_ID=xxx.apps.googleusercontent.com \\
+  --dart-define=BACKEND_API_URL=https://api.example.com \\
+  --dart-define=ML_SERVICE_URL=https://api.example.com \\
   --dart-define=MAPBOX_STYLE_URL=mapbox://styles/... \\
-  --dart-define=BACKEND_API_URL=http://your-server:8080 \\
-  --dart-define=ML_SERVICE_URL=http://your-server:8001 \\
-  --dart-define=GEMINI_API_KEY=AI... \\
-  --dart-define=GEMINI_MODEL=gemini-1.5-flash \\
-  --dart-define=REDIS_URL=134.199.187.2:6379 \\
-  --dart-define=REDIS_PASSWORD=your_password \\
-  --dart-define=ENABLE_AI_COACHING=true \\
-  --dart-define=ENABLE_EDGE_FUNCTIONS=true \\
-  --dart-define=ENABLE_BACKGROUND_GPS=true \\
-  --dart-define=ENABLE_PRIVACY_SHROUD=true \\
-  --dart-define=GPS_UPDATE_INTERVAL_MS=1500 \\
-  --dart-define=GPS_ACCURACY_THRESHOLD_METERS=20 \\
-  --dart-define=GPS_DISTANCE_FILTER_METERS=5 \\
-  --dart-define=HOME_PRIVACY_RADIUS_METERS=200
+  --dart-define=GEMINI_MODEL=gemini-2.0-flash
 ''';
 }

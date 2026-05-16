@@ -41,4 +41,9 @@ abstract class AuthRepository {
 
   /// Update password
   Future<void> updatePassword({required String newPassword});
+
+  /// Permanently delete the current user's account and all owned data.
+  /// Implementations must invoke a server-side function that uses the
+  /// service-role key; never expose service-role keys to the client.
+  Future<void> deleteAccount();
 }

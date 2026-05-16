@@ -31,8 +31,7 @@ class HrvService {
   final Health _health = Health();
 
   /// Get the latest HRV reading
-  HrvData? get latestReading =>
-      _history.isNotEmpty ? _history.last : null;
+  HrvData? get latestReading => _history.isNotEmpty ? _history.last : null;
 
   /// Get the 7-day baseline RMSSD
   double? get baselineRmssd => _baselineRmssd;
@@ -59,7 +58,9 @@ class HrvService {
         permissions: types.map((_) => HealthDataAccess.READ).toList(),
       );
 
-      debugPrint('HrvService: Health permissions ${_authorized ? "granted" : "denied"}');
+      debugPrint(
+        'HrvService: Health permissions ${_authorized ? "granted" : "denied"}',
+      );
       return _authorized;
     } catch (e) {
       debugPrint('HrvService: Permission request failed: $e');
@@ -105,7 +106,8 @@ class HrvService {
 
       // Use the most recent HRV reading
       final latestHrv = hrvData.last;
-      final rmssd = (latestHrv.value as NumericHealthValue).numericValue.toDouble();
+      final rmssd = (latestHrv.value as NumericHealthValue).numericValue
+          .toDouble();
 
       // Calculate resting HR (lowest HR reading from today)
       int restingHr = 60; // default
@@ -134,8 +136,10 @@ class HrvService {
       _history.add(data);
       _updateBaseline();
 
-      debugPrint('HrvService: HRV fetched — RMSSD: ${rmssd.toStringAsFixed(1)}ms, '
-          'Score: $hrvScore, Recovery: ${recovery.name}');
+      debugPrint(
+        'HrvService: HRV fetched — RMSSD: ${rmssd.toStringAsFixed(1)}ms, '
+        'Score: $hrvScore, Recovery: ${recovery.name}',
+      );
       return data;
     } catch (e) {
       debugPrint('HrvService: Failed to fetch HRV: $e');
@@ -200,19 +204,25 @@ class HrvService {
       }
 
       // Use SLEEP_ASLEEP or SLEEP_IN_BED as total
-      final totalMinutes = asleepMinutes > 0 ? asleepMinutes : totalInBedMinutes;
+      final totalMinutes = asleepMinutes > 0
+          ? asleepMinutes
+          : totalInBedMinutes;
       if (totalMinutes < 30) return null; // Too little data
 
       final summary = SleepSummary(
         durationMinutes: totalMinutes,
         deepSleepRatio: totalMinutes > 0 ? deepSleepMinutes / totalMinutes : 0,
         remSleepRatio: totalMinutes > 0 ? remSleepMinutes / totalMinutes : 0,
-        efficiency: totalInBedMinutes > 0 ? asleepMinutes / totalInBedMinutes : 0.85,
+        efficiency: totalInBedMinutes > 0
+            ? asleepMinutes / totalInBedMinutes
+            : 0.85,
       );
 
-      debugPrint('HrvService: Sleep fetched — ${totalMinutes}min total, '
-          '${(summary.deepSleepRatio * 100).toInt()}% deep, '
-          '${(summary.remSleepRatio * 100).toInt()}% REM');
+      debugPrint(
+        'HrvService: Sleep fetched — ${totalMinutes}min total, '
+        '${(summary.deepSleepRatio * 100).toInt()}% deep, '
+        '${(summary.remSleepRatio * 100).toInt()}% REM',
+      );
       return summary;
     } catch (e) {
       debugPrint('HrvService: Failed to fetch sleep data: $e');
@@ -247,23 +257,35 @@ class HrvService {
     if (hrv != null && _baselineRmssd != null && _baselineRmssd! > 0) {
       final ratio = hrv.rmssd / _baselineRmssd!;
       if (ratio >= 1.1) {
-        score += 40;       // Above baseline
-      } else if (ratio >= 0.9) score += 30;  // Near baseline
-      else if (ratio >= 0.7) score += 15;  // Below baseline
-      else score += 5;                      // Well below
+        score += 40; // Above baseline
+      } else if (ratio >= 0.9) {
+        score += 30; // Near baseline
+      } else if (ratio >= 0.7) {
+        score += 15; // Below baseline
+      } else {
+        score += 5; // Well below
+      }
     } else if (hrv != null) {
       // No baseline yet — use absolute values
       if (hrv.rmssd > 70) {
         score += 35;
-      } else if (hrv.rmssd > 50) score += 25;
-      else if (hrv.rmssd > 30) score += 15;
-      else score += 5;
+      } else if (hrv.rmssd > 50) {
+        score += 25;
+      } else if (hrv.rmssd > 30) {
+        score += 15;
+      } else {
+        score += 5;
+      }
     }
 
     // Sleep component (up to 10 points)
     if (sleep != null) {
-      if (sleep.durationMinutes >= 420) score += 5; // 7+ hours
-      if (sleep.deepSleepRatio >= 0.2) score += 5;  // 20%+ deep sleep
+      if (sleep.durationMinutes >= 420) {
+        score += 5; // 7+ hours
+      }
+      if (sleep.deepSleepRatio >= 0.2) {
+        score += 5; // 20%+ deep sleep
+      }
     }
 
     return score.clamp(0, 100);
@@ -298,7 +320,7 @@ class HrvService {
     if (recentReadings.length >= 3) {
       _baselineRmssd =
           recentReadings.map((h) => h.rmssd).reduce((a, b) => a + b) /
-              recentReadings.length;
+          recentReadings.length;
     }
   }
 
@@ -360,29 +382,43 @@ class SleepSummary {
     int score = 0;
     // Duration component (max 40)
     if (durationMinutes >= 480) {
-      score += 40;       // 8+ hours
-    } else if (durationMinutes >= 420) score += 35;  // 7-8 hours
-    else if (durationMinutes >= 360) score += 25;  // 6-7 hours
-    else score += 10;
+      score += 40; // 8+ hours
+    } else if (durationMinutes >= 420) {
+      score += 35; // 7-8 hours
+    } else if (durationMinutes >= 360) {
+      score += 25; // 6-7 hours
+    } else {
+      score += 10;
+    }
 
     // Deep sleep component (max 25)
     if (deepSleepRatio >= 0.25) {
       score += 25;
-    } else if (deepSleepRatio >= 0.20) score += 20;
-    else if (deepSleepRatio >= 0.15) score += 15;
-    else score += 5;
+    } else if (deepSleepRatio >= 0.20) {
+      score += 20;
+    } else if (deepSleepRatio >= 0.15) {
+      score += 15;
+    } else {
+      score += 5;
+    }
 
     // REM component (max 20)
     if (remSleepRatio >= 0.25) {
       score += 20;
-    } else if (remSleepRatio >= 0.20) score += 15;
-    else score += 5;
+    } else if (remSleepRatio >= 0.20) {
+      score += 15;
+    } else {
+      score += 5;
+    }
 
     // Efficiency component (max 15)
     if (efficiency >= 0.90) {
       score += 15;
-    } else if (efficiency >= 0.85) score += 10;
-    else score += 5;
+    } else if (efficiency >= 0.85) {
+      score += 10;
+    } else {
+      score += 5;
+    }
 
     return score.clamp(0, 100);
   }

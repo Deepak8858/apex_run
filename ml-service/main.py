@@ -16,22 +16,44 @@ from typing import Optional, List
 from pathlib import Path
 import numpy as np
 import json
+import os
+
+APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
+MODELS_DIR = Path(__file__).parent / "models"
+MODELS_DIR.mkdir(exist_ok=True)
+
+
+def cors_allow_origins() -> List[str]:
+    raw_origins = os.environ.get("CORS_ALLOW_ORIGINS", "*").strip()
+    if not raw_origins:
+        return ["*"]
+    return [
+        origin.strip()
+        for origin in raw_origins.split(",")
+        if origin.strip()
+    ]
+
+
+def runtime_port(default: int = 8001) -> int:
+    raw_port = os.environ.get("PORT", str(default))
+    try:
+        return int(raw_port)
+    except ValueError:
+        return default
 
 app = FastAPI(
     title="ApexRun ML Service",
     description="Machine Learning models for running performance analysis",
-    version="1.0.0",
+    version=APP_VERSION,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-MODELS_DIR = Path(__file__).parent / "models"
 
 
 # ================================================================
@@ -93,7 +115,21 @@ class TrainingLoadResponse(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ml-service", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "service": "ml-service",
+        "version": APP_VERSION,
+        "models_available": len(list(MODELS_DIR.glob("*.tflite"))),
+    }
+
+
+@app.get("/ready")
+async def ready():
+    return {
+        "status": "ready",
+        "models_dir_exists": MODELS_DIR.exists(),
+        "models_available": len(list(MODELS_DIR.glob("*.tflite"))),
+    }
 
 
 # ================================================================
@@ -277,7 +313,7 @@ async def analyze_training_load(request: TrainingLoadRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=runtime_port())
 
 
 # ================================================================

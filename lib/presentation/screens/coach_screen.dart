@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/services/adaptive_plan_service.dart';
 import '../../domain/models/planned_workout.dart';
 import '../providers/app_providers.dart';
 import 'form_analysis_screen.dart';
@@ -52,13 +53,20 @@ class CoachScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
 
+              _AdaptivePlanCard(
+                isGenerating: coachState.isGeneratingPlan,
+                summary: coachState.planSummary,
+                onGenerate: (goal, weeks) => ref
+                    .read(coachControllerProvider.notifier)
+                    .generateAdaptivePlan(goal: goal, weeks: weeks),
+              ),
+              const SizedBox(height: 16),
+
               // Form Analysis Quick Action
               _FormAnalysisEntryCard(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const FormAnalysisScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const FormAnalysisScreen()),
                 ),
               ),
               const SizedBox(height: 24),
@@ -76,8 +84,10 @@ class CoachScreen extends ConsumerWidget {
               ],
 
               // Today's Workout
-              Text("Today's Workout",
-                  style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                "Today's Workout",
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 12),
               // Show generated workout from state if available, otherwise from DB
               if (coachState.generatedWorkout != null)
@@ -90,8 +100,8 @@ class CoachScreen extends ConsumerWidget {
                         onGenerate: coachState.isGenerating
                             ? null
                             : () => ref
-                                .read(coachControllerProvider.notifier)
-                                .generateDailyWorkout(),
+                                  .read(coachControllerProvider.notifier)
+                                  .generateDailyWorkout(),
                       );
                     }
                     return _DetailedWorkoutCard(workout: workout);
@@ -101,15 +111,17 @@ class CoachScreen extends ConsumerWidget {
                     onGenerate: coachState.isGenerating
                         ? null
                         : () => ref
-                            .read(coachControllerProvider.notifier)
-                            .generateDailyWorkout(),
+                              .read(coachControllerProvider.notifier)
+                              .generateDailyWorkout(),
                   ),
                 ),
               const SizedBox(height: 24),
 
               // Upcoming Workouts
-              Text('Upcoming Workouts',
-                  style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Upcoming Workouts',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 12),
               upcomingWorkouts.when(
                 data: (workouts) {
@@ -128,16 +140,19 @@ class CoachScreen extends ConsumerWidget {
                   }
                   return Column(
                     children: workouts
-                        .map((w) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _CompactWorkoutCard(workout: w),
-                            ))
+                        .map(
+                          (w) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _CompactWorkoutCard(workout: w),
+                          ),
+                        )
                         .toList(),
                   );
                 },
                 loading: () => const _LoadingCard(),
                 error: (e, _) => const _ErrorCard(
-                    message: 'Could not load upcoming workouts'),
+                  message: 'Could not load upcoming workouts',
+                ),
               ),
               const SizedBox(height: 32),
             ],
@@ -151,6 +166,232 @@ class CoachScreen extends ConsumerWidget {
 // ============================================================
 // Coach Header
 // ============================================================
+
+class _AdaptivePlanCard extends StatefulWidget {
+  const _AdaptivePlanCard({
+    required this.isGenerating,
+    required this.summary,
+    required this.onGenerate,
+  });
+
+  final bool isGenerating;
+  final AdaptivePlanSummary? summary;
+  final void Function(TrainingPlanGoal goal, int weeks) onGenerate;
+
+  @override
+  State<_AdaptivePlanCard> createState() => _AdaptivePlanCardState();
+}
+
+class _AdaptivePlanCardState extends State<_AdaptivePlanCard> {
+  TrainingPlanGoal _goal = TrainingPlanGoal.tenK;
+  int _weeks = 4;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.surfaceLight),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppTheme.electricLime.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: AppTheme.electricLime,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Adaptive Plan',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Build a recovery-aware training calendar',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<TrainingPlanGoal>(
+                  initialValue: _goal,
+                  decoration: const InputDecoration(
+                    labelText: 'Goal',
+                    isDense: true,
+                  ),
+                  dropdownColor: AppTheme.cardBackground,
+                  items: TrainingPlanGoal.values
+                      .map(
+                        (goal) => DropdownMenuItem(
+                          value: goal,
+                          child: Text(goal.label),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: widget.isGenerating
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => _goal = value);
+                        },
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 116,
+                child: DropdownButtonFormField<int>(
+                  initialValue: _weeks,
+                  decoration: const InputDecoration(
+                    labelText: 'Weeks',
+                    isDense: true,
+                  ),
+                  dropdownColor: AppTheme.cardBackground,
+                  items: const [4, 8, 12, 16]
+                      .map(
+                        (weeks) => DropdownMenuItem(
+                          value: weeks,
+                          child: Text('$weeks'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: widget.isGenerating
+                      ? null
+                      : (value) {
+                          if (value != null) setState(() => _weeks = value);
+                        },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: widget.isGenerating
+                  ? null
+                  : () => widget.onGenerate(_goal, _weeks),
+              icon: widget.isGenerating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome_rounded),
+              label: Text(
+                widget.isGenerating ? 'Building plan...' : 'Build Plan',
+              ),
+            ),
+          ),
+          if (widget.summary != null) ...[
+            const SizedBox(height: 14),
+            _PlanSummary(summary: widget.summary!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanSummary extends StatelessWidget {
+  const _PlanSummary({required this.summary});
+
+  final AdaptivePlanSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceLight.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${summary.goalLabel} plan created',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _SummaryChip('${summary.weekCount} weeks'),
+              _SummaryChip('${summary.totalWorkouts} workouts'),
+              _SummaryChip('Week 1 ${summary.firstWeekDistanceLabel}'),
+              _SummaryChip('Peak ${summary.peakWeekDistanceLabel}'),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            summary.adaptationNote,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.electricLime.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.electricLime,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
 
 class _CoachHeader extends StatelessWidget {
   final bool isGenerating;
@@ -220,7 +461,8 @@ class _CoachHeader extends StatelessWidget {
                   children: [
                     Text(
                       'Gemini Coach',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
@@ -228,7 +470,9 @@ class _CoachHeader extends StatelessWidget {
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.electricLime.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
@@ -236,9 +480,9 @@ class _CoachHeader extends StatelessWidget {
                       child: Text(
                         'Powered by Gemini 1.5 Flash',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppTheme.electricLime,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: AppTheme.electricLime,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -351,7 +595,12 @@ class _DetailedWorkoutCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(left: 26, right: 20, top: 24, bottom: 24),
+              padding: const EdgeInsets.only(
+                left: 26,
+                right: 20,
+                top: 24,
+                bottom: 24,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -359,17 +608,21 @@ class _DetailedWorkoutCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                        color: AppTheme.electricLime.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
+                          color: AppTheme.electricLime.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
                             color: AppTheme.electricLime.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Text(
                           'RECOMMENDED TODAY',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
                                 color: AppTheme.electricLime,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
@@ -377,39 +630,44 @@ class _DetailedWorkoutCard extends StatelessWidget {
                         ),
                       ),
                       if (workout.isCompleted)
-                        const Icon(Icons.check_circle_rounded, color: AppTheme.success)
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          color: AppTheme.success,
+                        ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Text(
                     _formatWorkoutTitle(workout.workoutType),
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.1,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      height: 1.1,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     workout.description,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textSecondary,
-                          height: 1.5,
-                        ),
+                      color: AppTheme.textSecondary,
+                      height: 1.5,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   Row(
                     children: [
                       if (workout.formattedTargetDuration != null)
                         _InteractiveStatBadge(
-                            icon: Icons.timer_outlined,
-                            label: workout.formattedTargetDuration!),
+                          icon: Icons.timer_outlined,
+                          label: workout.formattedTargetDuration!,
+                        ),
                       if (workout.formattedTargetDistance != null) ...[
                         const SizedBox(width: 12),
                         _InteractiveStatBadge(
-                            icon: Icons.straighten,
-                            label: workout.formattedTargetDistance!),
-                      ]
+                          icon: Icons.straighten,
+                          label: workout.formattedTargetDistance!,
+                        ),
+                      ],
                     ],
                   ),
                   if (workout.coachingRationale != null) ...[
@@ -419,22 +677,21 @@ class _DetailedWorkoutCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.background,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppTheme.surfaceLight,
-                        ),
+                        border: Border.all(color: AppTheme.surfaceLight),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.psychology_alt_rounded,
-                              size: 20, color: AppTheme.electricLime),
+                          const Icon(
+                            Icons.psychology_alt_rounded,
+                            size: 20,
+                            color: AppTheme.electricLime,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               workout.coachingRationale!,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: AppTheme.textSecondary,
                                     fontStyle: FontStyle.italic,
@@ -457,10 +714,13 @@ class _DetailedWorkoutCard extends StatelessWidget {
 
   String _formatWorkoutTitle(String type) {
     // Convert 'recovery_run' to 'Recovery Run'
-    return type.split('_').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return type
+        .split('_')
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 }
 
@@ -468,10 +728,7 @@ class _InteractiveStatBadge extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _InteractiveStatBadge({
-    required this.icon,
-    required this.label,
-  });
+  const _InteractiveStatBadge({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -636,8 +893,11 @@ class _CompactWorkoutCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: color.withValues(alpha: 0.2)),
                     ),
-                    child: Icon(_getIconForType(workout.workoutType),
-                        color: color, size: 28),
+                    child: Icon(
+                      _getIconForType(workout.workoutType),
+                      color: color,
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -646,7 +906,8 @@ class _CompactWorkoutCard extends StatelessWidget {
                       children: [
                         Text(
                           _formatWorkoutTitle(workout.workoutType),
-                          style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                          style: Theme.of(ctx).textTheme.headlineSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -666,7 +927,9 @@ class _CompactWorkoutCard extends StatelessWidget {
                   if (workout.isCompleted)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.success.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -674,14 +937,20 @@ class _CompactWorkoutCard extends StatelessWidget {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_circle_rounded,
-                              color: AppTheme.success, size: 16),
+                          Icon(
+                            Icons.check_circle_rounded,
+                            color: AppTheme.success,
+                            size: 16,
+                          ),
                           SizedBox(width: 4),
-                          Text('Done',
-                              style: TextStyle(
-                                  color: AppTheme.success,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12)),
+                          Text(
+                            'Done',
+                            style: TextStyle(
+                              color: AppTheme.success,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -699,12 +968,15 @@ class _CompactWorkoutCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Description',
-                        style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            letterSpacing: 0.5)),
+                    const Text(
+                      'Description',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       workout.description,
@@ -758,21 +1030,28 @@ class _CompactWorkoutCard extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                        color: AppTheme.electricLime.withValues(alpha: 0.15)),
+                      color: AppTheme.electricLime.withValues(alpha: 0.15),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.psychology_alt_rounded,
-                              size: 18, color: AppTheme.electricLime),
+                          Icon(
+                            Icons.psychology_alt_rounded,
+                            size: 18,
+                            color: AppTheme.electricLime,
+                          ),
                           SizedBox(width: 8),
-                          Text('Coach\'s Rationale',
-                              style: TextStyle(
-                                  color: AppTheme.electricLime,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13)),
+                          Text(
+                            'Coach\'s Rationale',
+                            style: TextStyle(
+                              color: AppTheme.electricLime,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -812,18 +1091,20 @@ class _CompactWorkoutCard extends StatelessWidget {
       ),
     );
   }
-  
+
   String _formatWorkoutTitle(String type) {
-     return type.split('_').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return type
+        .split('_')
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final diff =
-        date.difference(DateTime(now.year, now.month, now.day)).inDays;
+    final diff = date.difference(DateTime(now.year, now.month, now.day)).inDays;
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Tomorrow';
     return 'In $diff days';
@@ -842,8 +1123,11 @@ class _NoWorkoutCard extends StatelessWidget {
         child: Center(
           child: Column(
             children: [
-              const Icon(Icons.calendar_today_rounded,
-                  size: 48, color: AppTheme.textTertiary),
+              const Icon(
+                Icons.calendar_today_rounded,
+                size: 48,
+                color: AppTheme.textTertiary,
+              ),
               const SizedBox(height: 12),
               Text(
                 'No workout planned for today',
@@ -887,14 +1171,18 @@ class _InsightCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.lightbulb_rounded,
-                  size: 20, color: AppTheme.info),
+              const Icon(
+                Icons.lightbulb_rounded,
+                size: 20,
+                color: AppTheme.info,
+              ),
               const SizedBox(width: 8),
-              Text('Coach Insight',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: AppTheme.info)),
+              Text(
+                'Coach Insight',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(color: AppTheme.info),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -904,8 +1192,6 @@ class _InsightCard extends StatelessWidget {
     );
   }
 }
-
-
 
 class _ErrorBanner extends StatelessWidget {
   final String message;
@@ -922,12 +1208,17 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded,
-              color: AppTheme.error, size: 20),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppTheme.error,
+            size: 20,
+          ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(message,
-                style: const TextStyle(color: AppTheme.error, fontSize: 13)),
+            child: Text(
+              message,
+              style: const TextStyle(color: AppTheme.error, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -949,8 +1240,10 @@ class _ErrorCard extends StatelessWidget {
             const Icon(Icons.error_outline_rounded, color: AppTheme.error),
             const SizedBox(width: 12),
             Expanded(
-              child:
-                  Text(message, style: const TextStyle(color: AppTheme.error)),
+              child: Text(
+                message,
+                style: const TextStyle(color: AppTheme.error),
+              ),
             ),
           ],
         ),
@@ -1016,8 +1309,11 @@ class _FormAnalysisEntryCard extends StatelessWidget {
                   color: AppTheme.info.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: const Icon(Icons.camera_alt_rounded,
-                    color: AppTheme.info, size: 26),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: AppTheme.info,
+                  size: 26,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1027,16 +1323,16 @@ class _FormAnalysisEntryCard extends StatelessWidget {
                     Text(
                       'Running Form Analysis',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
-                          ),
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Use camera + AI to analyze your running form',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -1047,8 +1343,11 @@ class _FormAnalysisEntryCard extends StatelessWidget {
                   color: AppTheme.info.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.arrow_forward_rounded,
-                    color: AppTheme.info, size: 20),
+                child: const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppTheme.info,
+                  size: 20,
+                ),
               ),
             ],
           ),
@@ -1089,18 +1388,24 @@ class _DetailStatBox extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(height: 8),
-          Text(label,
-              style: TextStyle(
-                  color: color.withValues(alpha: 0.7),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color.withValues(alpha: 0.7),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );

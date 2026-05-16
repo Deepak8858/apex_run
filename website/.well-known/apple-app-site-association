@@ -1,0 +1,26 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "TEAMID.com.apexrun.app"
+        ],
+        "components": [
+          {
+            "/": "/invite/*",
+            "comment": "Referral and friend invite links"
+          },
+          {
+            "/": "/activity/*",
+            "comment": "Shared activity links"
+          },
+          {
+            "/": "/reset-password",
+            "comment": "Password reset deep link"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -9,10 +9,7 @@ import 'package:apex_run/domain/models/activity.dart';
 Widget testApp(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: overrides,
-    child: MaterialApp(
-      theme: AppTheme.darkTheme,
-      home: child,
-    ),
+    child: MaterialApp(theme: AppTheme.darkTheme, home: child),
   );
 }
 
@@ -95,22 +92,17 @@ void main() {
                   Icon(
                     Icons.directions_run_rounded,
                     size: 64,
-                    color: AppTheme.electricLime.withOpacity(0.5),
+                    color: AppTheme.electricLime.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 16),
                   const Text(
                     'No activities yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Start your first run to see stats here',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                    ),
+                    style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 ],
               ),
@@ -120,7 +112,10 @@ void main() {
       );
 
       expect(find.text('No activities yet'), findsOneWidget);
-      expect(find.text('Start your first run to see stats here'), findsOneWidget);
+      expect(
+        find.text('Start your first run to see stats here'),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.directions_run_rounded), findsOneWidget);
     });
 
@@ -144,7 +139,9 @@ void main() {
                 backgroundColor: AppTheme.electricLime,
                 child: Icon(Icons.directions_run, color: AppTheme.background),
               ),
-              title: Text('${(activity.distanceMeters / 1000).toStringAsFixed(2)} km'),
+              title: Text(
+                '${(activity.distanceMeters / 1000).toStringAsFixed(2)} km',
+              ),
               subtitle: Text(activity.formattedDuration),
               trailing: Text(
                 activity.formattedPace,
@@ -231,10 +228,7 @@ class _StatItem extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
         ),
       ],
     );

@@ -47,12 +47,14 @@ class TrackingControllerState {
   final Activity? lastSavedActivity;
   final String? errorMessage;
   final bool isSaving;
+  final List<String> newlyUnlockedAchievements;
 
   const TrackingControllerState({
     this.trackingState = TrackingState.idle,
     this.lastSavedActivity,
     this.errorMessage,
     this.isSaving = false,
+    this.newlyUnlockedAchievements = const [],
   });
 
   TrackingControllerState copyWith({
@@ -60,12 +62,15 @@ class TrackingControllerState {
     Activity? lastSavedActivity,
     String? errorMessage,
     bool? isSaving,
+    List<String>? newlyUnlockedAchievements,
   }) {
     return TrackingControllerState(
       trackingState: trackingState ?? this.trackingState,
       lastSavedActivity: lastSavedActivity ?? this.lastSavedActivity,
       errorMessage: errorMessage,
       isSaving: isSaving ?? this.isSaving,
+      newlyUnlockedAchievements:
+          newlyUnlockedAchievements ?? this.newlyUnlockedAchievements,
     );
   }
 }
@@ -142,11 +147,51 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
         activity: activity,
       );
 
-      state = state.copyWith(
-        isSaving: false,
-        lastSavedActivity: activity,
-      );
-      return activity;
+      // Phase 3/4: streak update + achievement evaluation. Run sequentially —
+      // achievement evaluator needs the post-save streak count.
+      try {
+        final streak = _ref.read(streakServiceProvider);
+        final (currentStreak, _) =
+            await streak.markActivityCompleted(activity.startTime);
+
+        final achievements = _ref.read(achievementServiceProvider);
+        final unlocked = await achievements.evaluateForActivity(
+          activity: activity.copyWith(id: activityId),
+          currentStreak: currentStreak,
+        );
+
+        // Roll progress on all active enrolled challenges.
+        await _ref
+            .read(challengeServiceProvider)
+            .applyActivity(activity.copyWith(id: activityId));
+
+        // Refresh providers that surface this data.
+        _ref.invalidate(userProfileProvider);
+        _ref.invalidate(myAchievementsProvider);
+        _ref.invalidate(activeChallengesProvider);
+
+        state = state.copyWith(
+          isSaving: false,
+          lastSavedActivity: activity,
+          newlyUnlockedAchievements: unlocked,
+        );
+
+        // Audio coach announces a final summary if the user wants it.
+        // Fail-quiet: any TTS failure must NOT roll back the save.
+        try {
+          final coach = _ref.read(audioCoachServiceProvider);
+          await coach.announceStop(_service.currentMetrics);
+        } catch (_) {/* TTS failures are non-fatal */}
+
+        return activity.copyWith(id: activityId);
+      } catch (e) {
+        // Hooks failed but the activity IS saved. Don't surface error.
+        state = state.copyWith(
+          isSaving: false,
+          lastSavedActivity: activity,
+        );
+        return activity.copyWith(id: activityId);
+      }
     } catch (e) {
       state = state.copyWith(
         isSaving: false,

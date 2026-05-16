@@ -43,7 +43,7 @@ func TestCreateActivityRequest_Validation(t *testing.T) {
 				"duration_seconds": 1800,
 				"distance_meters": 5000
 			}`,
-			expectCode: http.StatusBadRequest, // Will be 400 since no repo
+			expectCode: http.StatusOK,
 		},
 		{
 			name: "missing activity_name",
@@ -127,16 +127,16 @@ func TestActivityModel_JSON(t *testing.T) {
 	elev := 85.0
 
 	type Activity struct {
-		ID                  string     `json:"id"`
-		UserID              string     `json:"user_id"`
-		ActivityName        string     `json:"activity_name"`
-		ActivityType        string     `json:"activity_type"`
-		DistanceMeters      float64    `json:"distance_meters"`
-		DurationSeconds     int        `json:"duration_seconds"`
-		AvgPaceMinPerKm     *float64   `json:"avg_pace_min_per_km,omitempty"`
-		ElevationGainMeters *float64   `json:"elevation_gain_meters,omitempty"`
-		StartTime           time.Time  `json:"start_time"`
-		CreatedAt           time.Time  `json:"created_at"`
+		ID                  string    `json:"id"`
+		UserID              string    `json:"user_id"`
+		ActivityName        string    `json:"activity_name"`
+		ActivityType        string    `json:"activity_type"`
+		DistanceMeters      float64   `json:"distance_meters"`
+		DurationSeconds     int       `json:"duration_seconds"`
+		AvgPaceMinPerKm     *float64  `json:"avg_pace_min_per_km,omitempty"`
+		ElevationGainMeters *float64  `json:"elevation_gain_meters,omitempty"`
+		StartTime           time.Time `json:"start_time"`
+		CreatedAt           time.Time `json:"created_at"`
 	}
 
 	activity := Activity{

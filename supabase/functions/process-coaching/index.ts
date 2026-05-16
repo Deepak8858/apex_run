@@ -91,6 +91,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Per-user daily quota check (RPC enforces auth.uid()).
+    try {
+      const quotaResp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/check_and_increment_ai_quota`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": authHeader as string,
+        },
+        body: JSON.stringify({
+          p_endpoint: "process-coaching",
+          p_daily_limit: 25,
+        }),
+      });
+      if (quotaResp.ok) {
+        const rows = await quotaResp.json();
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        if (row && row.allowed === false) {
+          return new Response(
+            JSON.stringify({ error: "daily quota exceeded", remaining: 0 }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      } else {
+        console.warn("quota RPC non-ok:", quotaResp.status);
+      }
+    } catch (e) {
+      console.warn("quota check skipped:", e);
+    }
+
     const body: CoachingRequest = await req.json();
 
     // Build prompt for Gemini

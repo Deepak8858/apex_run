@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/activity.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../../domain/models/gps_point.dart';
 import '../../domain/models/planned_workout.dart';
 import '../../domain/models/weekly_stats.dart';
@@ -10,7 +11,9 @@ import '../providers/app_providers.dart';
 import '../providers/step_tracking_provider.dart';
 import 'activity_dashboard_screen.dart';
 import 'activity_detail_screen.dart';
+import 'coach_screen.dart';
 import 'form_analysis_screen.dart';
+import 'leaderboard_screen.dart';
 
 /// Home Screen - Dashboard
 ///
@@ -26,6 +29,8 @@ class HomeScreen extends ConsumerWidget {
     final weeklyStats = ref.watch(weeklyStatsProvider);
     final recentActivities = ref.watch(recentActivitiesProvider);
     final upcomingWorkouts = ref.watch(upcomingWorkoutsProvider);
+    final profile = ref.watch(userProfileProvider);
+    final l = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -64,33 +69,25 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Welcome Back',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                            ),
+                            l.greetingWelcome,
+                            style: Theme.of(context).textTheme.headlineMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.5,
+                                ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Ready to crush your next run?',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppTheme.textSecondary,
-                                ),
+                            l.greetingSub,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: AppTheme.textSecondary),
                           ),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: AppTheme.textSecondary,
-                        size: 22,
-                      ),
+                    profile.maybeWhen(
+                      data: (p) => _StreakBadge(streakDays: p?.streakDays ?? 0),
+                      orElse: () => const SizedBox.shrink(),
                     ),
                   ],
                 ),
@@ -98,6 +95,10 @@ class HomeScreen extends ConsumerWidget {
 
                 // Today's Steps Card
                 _TodayStepsCard(),
+                const SizedBox(height: 24),
+
+                // Recovery score (Phase 5)
+                _RecoveryCard(),
                 const SizedBox(height: 24),
 
                 // Weekly Summary Card
@@ -122,7 +123,7 @@ class HomeScreen extends ConsumerWidget {
 
                 // Recent Activities
                 _SectionHeader(
-                  title: 'Recent Activities',
+                  title: l.recentActivities,
                   trailing: recentActivities.valueOrNull?.isNotEmpty == true
                       ? TextButton(
                           onPressed: () {},
@@ -134,26 +135,28 @@ class HomeScreen extends ConsumerWidget {
                 recentActivities.when(
                   data: (activities) {
                     if (activities.isEmpty) {
-                      return const _EmptyStateCard(
-                        message: 'No activities yet. Start your first run!',
+                      return _EmptyStateCard(
+                        message: l.noActivitiesYet,
                         icon: Icons.directions_run_rounded,
                       );
                     }
                     return Column(
                       children: activities
-                          .map((a) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: GestureDetector(
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ActivityDetailScreen(activity: a),
-                                    ),
+                          .map(
+                            (a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ActivityDetailScreen(activity: a),
                                   ),
-                                  child: _ActivityCard(activity: a),
                                 ),
-                              ))
+                                child: _ActivityCard(activity: a),
+                              ),
+                            ),
+                          )
                           .toList(),
                     );
                   },
@@ -177,13 +180,15 @@ class HomeScreen extends ConsumerWidget {
                     return Column(
                       children: workouts
                           .take(3)
-                          .map((w) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: GestureDetector(
-                                  onTap: () => _showWorkoutDetail(context, w),
-                                  child: _WorkoutCard(workout: w),
-                                ),
-                              ))
+                          .map(
+                            (w) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: GestureDetector(
+                                onTap: () => _showWorkoutDetail(context, w),
+                                child: _WorkoutCard(workout: w),
+                              ),
+                            ),
+                          )
                           .toList(),
                     );
                   },
@@ -269,7 +274,8 @@ class _WeeklySummaryCard extends StatelessWidget {
                       const SizedBox(width: 12),
                       Text(
                         'Weekly Progress',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
                             ),
@@ -312,11 +318,7 @@ class _WeeklySummaryCard extends StatelessWidget {
 class _VerticalDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 32,
-      width: 1,
-      color: AppTheme.surfaceLight,
-    );
+    return Container(height: 32, width: 1, color: AppTheme.surfaceLight);
   }
 }
 
@@ -337,24 +339,25 @@ class _MetricColumn extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           label.toUpperCase(),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.0,
-              ),
+            color: color,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.0,
+          ),
         ),
       ],
     );
   }
 }
+
 class _WeeklySummaryCardSkeleton extends StatelessWidget {
   const _WeeklySummaryCardSkeleton();
 
@@ -421,9 +424,7 @@ class _ActivityCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: hasRoute
                 ? CustomPaint(
-                    painter: _MiniRoutePainter(
-                      points: activity.rawGpsPoints,
-                    ),
+                    painter: _MiniRoutePainter(points: activity.rawGpsPoints),
                   )
                 : Icon(
                     _ActivityCardHelper.activityIcon(activity.activityType),
@@ -447,7 +448,11 @@ class _ActivityCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_rounded, size: 12, color: AppTheme.textTertiary),
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 12,
+                      color: AppTheme.textTertiary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       _ActivityCardHelper.formatDate(activity.startTime),
@@ -465,7 +470,11 @@ class _ActivityCard extends StatelessWidget {
                       color: AppTheme.textSecondary,
                     ),
                     const SizedBox(width: 12),
-                    Container(width: 1, height: 10, color: AppTheme.surfaceLight),
+                    Container(
+                      width: 1,
+                      height: 10,
+                      color: AppTheme.surfaceLight,
+                    ),
                     const SizedBox(width: 12),
                     _CompactStat(
                       value: activity.formattedDuration,
@@ -497,11 +506,7 @@ class _CompactStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       value,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: color,
-      ),
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
     );
   }
 }
@@ -594,12 +599,10 @@ class _MiniRoutePainter extends CustomPainter {
     canvas.drawPath(path, mainPaint);
 
     // Start dot
-    canvas.drawCircle(
-        first, 3.0, Paint()..color = AppTheme.success);
+    canvas.drawCircle(first, 3.0, Paint()..color = AppTheme.success);
     // End dot
     final last = project(points.last);
-    canvas.drawCircle(
-        last, 3.0, Paint()..color = AppTheme.error);
+    canvas.drawCircle(last, 3.0, Paint()..color = AppTheme.error);
   }
 
   @override
@@ -632,7 +635,8 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
           children: [
             Center(
               child: Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceLight,
                   borderRadius: BorderRadius.circular(2),
@@ -648,8 +652,11 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(_workoutDetailIcon(workout.workoutType),
-                      color: color, size: 28),
+                  child: Icon(
+                    _workoutDetailIcon(workout.workoutType),
+                    color: color,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -657,22 +664,35 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        workout.workoutType.split('_').map((w) =>
-                            w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1))
+                        workout.workoutType
+                            .split('_')
+                            .map(
+                              (w) => w.isEmpty
+                                  ? ''
+                                  : w[0].toUpperCase() + w.substring(1),
+                            )
                             .join(' '),
                         style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold, color: Colors.white),
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         _workoutDetailDate(workout.plannedDate),
-                        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 if (workout.isCompleted)
-                  const Icon(Icons.check_circle_rounded, color: AppTheme.success),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppTheme.success,
+                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -683,9 +703,14 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppTheme.surfaceLight),
               ),
-              child: Text(workout.description,
-                  style: const TextStyle(
-                      color: AppTheme.textPrimary, fontSize: 15, height: 1.6)),
+              child: Text(
+                workout.description,
+                style: const TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 15,
+                  height: 1.6,
+                ),
+              ),
             ),
             if (workout.targetDistanceMeters != null ||
                 workout.targetDurationMinutes != null) ...[
@@ -727,30 +752,40 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
                   ),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                      color: AppTheme.electricLime.withValues(alpha: 0.15)),
+                    color: AppTheme.electricLime.withValues(alpha: 0.15),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.psychology_alt_rounded,
-                            size: 18, color: AppTheme.electricLime),
+                        Icon(
+                          Icons.psychology_alt_rounded,
+                          size: 18,
+                          color: AppTheme.electricLime,
+                        ),
                         SizedBox(width: 8),
-                        Text("Coach's Rationale",
-                            style: TextStyle(
-                                color: AppTheme.electricLime,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13)),
+                        Text(
+                          "Coach's Rationale",
+                          style: TextStyle(
+                            color: AppTheme.electricLime,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    Text(workout.coachingRationale!,
-                        style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 14,
-                            height: 1.5,
-                            fontStyle: FontStyle.italic)),
+                    Text(
+                      workout.coachingRationale!,
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 14,
+                        height: 1.5,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -765,25 +800,39 @@ void _showWorkoutDetail(BuildContext context, PlannedWorkout workout) {
 
 Color _workoutDetailColor(String type) {
   switch (type) {
-    case 'easy': return AppTheme.success;
-    case 'tempo': return AppTheme.warning;
-    case 'intervals': return AppTheme.heartRate;
-    case 'long_run': return AppTheme.distance;
-    case 'recovery': return AppTheme.info;
-    case 'race': return AppTheme.electricLime;
-    default: return AppTheme.electricLime;
+    case 'easy':
+      return AppTheme.success;
+    case 'tempo':
+      return AppTheme.warning;
+    case 'intervals':
+      return AppTheme.heartRate;
+    case 'long_run':
+      return AppTheme.distance;
+    case 'recovery':
+      return AppTheme.info;
+    case 'race':
+      return AppTheme.electricLime;
+    default:
+      return AppTheme.electricLime;
   }
 }
 
 IconData _workoutDetailIcon(String type) {
   switch (type) {
-    case 'easy': return Icons.self_improvement_rounded;
-    case 'tempo': return Icons.speed_rounded;
-    case 'intervals': return Icons.flash_on_rounded;
-    case 'long_run': return Icons.route_rounded;
-    case 'recovery': return Icons.healing_rounded;
-    case 'race': return Icons.emoji_events_rounded;
-    default: return Icons.fitness_center_rounded;
+    case 'easy':
+      return Icons.self_improvement_rounded;
+    case 'tempo':
+      return Icons.speed_rounded;
+    case 'intervals':
+      return Icons.flash_on_rounded;
+    case 'long_run':
+      return Icons.route_rounded;
+    case 'recovery':
+      return Icons.healing_rounded;
+    case 'race':
+      return Icons.emoji_events_rounded;
+    default:
+      return Icons.fitness_center_rounded;
   }
 }
 
@@ -802,7 +851,9 @@ class _WorkoutDetailStat extends StatelessWidget {
   final String label;
   final String value;
   const _WorkoutDetailStat({
-    required this.icon, required this.label, required this.value,
+    required this.icon,
+    required this.label,
+    required this.value,
   });
 
   @override
@@ -818,11 +869,23 @@ class _WorkoutDetailStat extends StatelessWidget {
         children: [
           Icon(icon, color: AppTheme.textSecondary, size: 18),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(
-              color: AppTheme.textTertiary, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textTertiary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(
-              color: AppTheme.textPrimary, fontSize: 17, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -842,11 +905,33 @@ class _QuickActionsRow extends StatelessWidget {
     return Column(
       children: [
         _QuickActionCard(
+          icon: Icons.psychology_rounded,
+          label: 'AI\nCoach',
+          description: 'Workout plans, insights, coaching',
+          color: AppTheme.electricLime,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CoachScreen()),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _QuickActionCard(
           icon: Icons.camera_alt_rounded,
           label: 'Form\nAnalysis',
           description: 'AI-powered biomechanics feedback',
           color: AppTheme.info,
           onTap: onFormAnalysis,
+        ),
+        const SizedBox(height: 10),
+        _QuickActionCard(
+          icon: Icons.leaderboard_rounded,
+          label: 'Segments\n& Leaderboards',
+          description: 'Strava-style segment racing',
+          color: const Color(0xFFFFD166),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+          ),
         ),
         const SizedBox(height: 10),
         _QuickActionCard(
@@ -871,9 +956,11 @@ class _QuickActionCard extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
   const _QuickActionCard({
-    required this.icon, required this.label,
+    required this.icon,
+    required this.label,
     required this.description,
-    required this.color, required this.onTap,
+    required this.color,
+    required this.onTap,
   });
 
   @override
@@ -931,8 +1018,7 @@ class _QuickActionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded,
-                  color: color, size: 16),
+              Icon(Icons.arrow_forward_ios_rounded, color: color, size: 16),
             ],
           ),
         ),
@@ -1007,12 +1093,14 @@ class _WorkoutCard extends StatelessWidget {
             ),
           ),
           if (workout.formattedTargetDistance != null)
-             Container(
+            Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: AppTheme.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.electricLime.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppTheme.electricLime.withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 workout.formattedTargetDistance!,
@@ -1029,10 +1117,13 @@ class _WorkoutCard extends StatelessWidget {
   }
 
   String _formatWorkoutTitle(String type) {
-    return type.split('_').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    return type
+        .split('_')
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
   }
 
   IconData _workoutIcon(String type) {
@@ -1183,10 +1274,9 @@ class _ErrorCard extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.error),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.error),
             ),
           ),
         ],
@@ -1288,18 +1378,16 @@ class _TodayStepsCard extends ConsumerWidget {
                   Text(
                     'Today\'s Steps',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Text(
                         '${today.steps}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
+                        style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
@@ -1307,12 +1395,9 @@ class _TodayStepsCard extends ConsumerWidget {
                       ),
                       Text(
                         ' / ${today.stepGoal}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(
-                              color: AppTheme.textTertiary,
-                            ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textTertiary,
+                        ),
                       ),
                     ],
                   ),
@@ -1320,17 +1405,189 @@ class _TodayStepsCard extends ConsumerWidget {
                   Text(
                     '${today.formattedCalories} cal · ${today.formattedDistance}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded,
-                size: 16, color: AppTheme.textTertiary),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: AppTheme.textTertiary,
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Compact streak badge for the home header. Falls back to a muted bell when
+/// streak is 0 so the layout doesn't jump on day 1.
+class _StreakBadge extends StatelessWidget {
+  const _StreakBadge({required this.streakDays});
+
+  final int streakDays;
+
+  @override
+  Widget build(BuildContext context) {
+    if (streakDays <= 0) {
+      return Semantics(
+        label: 'No active streak',
+        button: false,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: const BoxDecoration(
+            color: AppTheme.surfaceLight,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.local_fire_department_outlined,
+            color: AppTheme.textSecondary,
+            size: 22,
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      label: '$streakDays day activity streak',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.electricLime.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.electricLime.withValues(alpha: 0.4),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: AppTheme.electricLime,
+              size: 18,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$streakDays',
+              style: const TextStyle(
+                color: AppTheme.electricLime,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's recovery score (0-100) with rec-band coloring.
+class _RecoveryCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(todayRecoveryProvider);
+    return async.when(
+      data: (rec) {
+        if (rec == null) return const SizedBox.shrink();
+        final color = HSVColor.fromAHSV(1, rec.hue, 0.7, 1).toColor();
+        return Semantics(
+          label:
+              'Recovery score ${rec.score} out of 100, ${rec.band}. '
+              '${rec.recommendation}',
+          excludeSemantics: true,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBackground,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: color.withValues(alpha: 0.6),
+                width: 1.2,
+              ),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        value: rec.score / 100,
+                        strokeWidth: 6,
+                        backgroundColor: AppTheme.surfaceLight,
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                      ),
+                      Text(
+                        '${rec.score}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Recovery ',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            rec.band,
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        rec.recommendation,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox(
+        height: 96,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: AppTheme.electricLime,
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }

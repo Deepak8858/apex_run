@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
@@ -8,131 +9,102 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config/env.dart';
+import '../../core/logger/app_logger.dart';
 
 /// Authentication Data Source using Supabase
 ///
-/// Handles all authentication operations including sign in, sign up, sign out,
-/// and session management. Supports email/password, Google, and Apple sign-in.
+/// All log statements MUST avoid PII (email, user IDs, tokens).
+/// The shared logger redacts known patterns but is best-effort only.
 class AuthDataSource {
-  final SupabaseClient _supabase;
-
   AuthDataSource(this._supabase);
 
-  /// Get current user session
+  final SupabaseClient _supabase;
+  final _log = AppLogger.tag('Auth');
+
   Session? get currentSession => _supabase.auth.currentSession;
-
-  /// Get current user
   User? get currentUser => _supabase.auth.currentUser;
-
-  /// Stream of authentication state changes
   Stream<AuthState> get authStateChanges => _supabase.auth.onAuthStateChange;
+  bool get isAuthenticated => currentSession != null && currentUser != null;
 
-  /// Sign in with email and password
   Future<AuthResponse> signInWithEmail({
     required String email,
     required String password,
   }) async {
     try {
-      print('🔐 Attempting email sign-in for: $email');
+      _log.i('Email sign-in started');
       final response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
-      print('✅ Sign-in successful! User ID: ${response.user?.id}');
+      _log.i('Email sign-in success');
       return response;
-    } catch (e) {
-      print('❌ Sign-in failed: $e');
+    } catch (e, st) {
+      _log.e('Email sign-in failed', error: e, stackTrace: st);
       rethrow;
     }
   }
 
-  /// Sign up with email and password
   Future<AuthResponse> signUpWithEmail({
     required String email,
     required String password,
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      print('📝 Attempting email sign-up for: $email');
+      _log.i('Email sign-up started');
       final response = await _supabase.auth.signUp(
         email: email,
         password: password,
         data: metadata,
       );
-      print('✅ Sign-up successful! User ID: ${response.user?.id}, Session: ${response.session != null}');
+      _log.i('Email sign-up success (session=${response.session != null})');
       return response;
-    } catch (e) {
-      print('❌ Sign-up failed: $e');
+    } catch (e, st) {
+      _log.e('Email sign-up failed', error: e, stackTrace: st);
       rethrow;
     }
   }
 
-  /// Sign in with Google — native in-app flow with browser fallback
-  ///
-  /// Primary: Uses GoogleSignIn package for native in-app sign-in,
-  /// then exchanges the ID token with Supabase via signInWithIdToken.
-  /// Fallback: If native flow fails, falls back to browser OAuth.
+  /// Sign in with Google — native in-app flow, browser fallback on failure.
   Future<AuthResponse> signInWithGoogle() async {
     try {
-      print('🔐 Attempting native Google Sign-In...');
-
-      // Try native Google Sign-In first
+      _log.i('Google sign-in started (native)');
       try {
         final response = await _nativeGoogleSignIn();
         if (response.session != null) {
-          print('✅ Native Google Sign-In successful!');
-          // Ensure profile exists for the new Google user
+          _log.i('Google sign-in success (native)');
           await _ensureProfileExists(response.user);
           return response;
         }
       } on PlatformException catch (e) {
-        print('⚠️ Native Google Sign-In unavailable: ${e.message}');
-        print('↪️ Falling back to browser OAuth...');
+        _log.w('Native Google sign-in unavailable; falling back to browser', error: e);
       } on AuthException catch (e) {
-        // If it's a user cancellation, don't fall back to browser
-        if (e.message.contains('cancelled')) {
-          rethrow;
-        }
-        print('⚠️ Native Google Sign-In auth error: ${e.message}');
-        print('↪️ Falling back to browser OAuth...');
+        if (e.message.contains('cancelled')) rethrow;
+        _log.w('Native Google sign-in auth error; falling back to browser', error: e);
       } catch (e) {
-        print('⚠️ Native Google Sign-In failed: $e');
-        print('↪️ Falling back to browser OAuth...');
+        _log.w('Native Google sign-in failed; falling back to browser', error: e);
       }
 
-      // Fallback: browser-based OAuth
       return await _browserGoogleSignIn();
-    } catch (e) {
-      print('❌ Google sign-in failed: $e');
+    } catch (e, st) {
+      _log.e('Google sign-in failed', error: e, stackTrace: st);
       rethrow;
     }
   }
 
-  /// Native in-app Google Sign-In using google_sign_in package
   Future<AuthResponse> _nativeGoogleSignIn() async {
-    // Configure GoogleSignIn — uses Web Client ID for Supabase token exchange
-    // On iOS, clientId is required (iOS OAuth Client ID or Web Client ID)
-    // On Android, serverClientId is used to request the ID token
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
 
     final googleSignIn = GoogleSignIn(
-      // iOS needs clientId; use iOS client ID if available, fall back to Web Client ID
       clientId: isIos
           ? (Env.googleIosClientId.isNotEmpty
               ? Env.googleIosClientId
-              : (Env.googleWebClientId.isNotEmpty
-                  ? Env.googleWebClientId
-                  : null))
+              : (Env.googleWebClientId.isNotEmpty ? Env.googleWebClientId : null))
           : null,
-      // serverClientId is for Android to get an ID token for backend exchange
-      serverClientId: Env.googleWebClientId.isNotEmpty
-          ? Env.googleWebClientId
-          : null,
-      scopes: ['email', 'profile'],
+      serverClientId: Env.googleWebClientId.isNotEmpty ? Env.googleWebClientId : null,
+      scopes: const ['email', 'profile'],
     );
 
-    // Sign out first to force account picker
-    await googleSignIn.signOut();
+    await googleSignIn.signOut(); // force account picker
 
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) {
@@ -147,46 +119,33 @@ class AuthDataSource {
       throw const AuthException('Failed to get Google ID token');
     }
 
-    // Exchange the Google ID token with Supabase
-    final response = await _supabase.auth.signInWithIdToken(
+    return _supabase.auth.signInWithIdToken(
       provider: OAuthProvider.google,
       idToken: idToken,
       accessToken: accessToken,
     );
-
-    return response;
   }
 
-  /// Browser-based Google OAuth (fallback)
   Future<AuthResponse> _browserGoogleSignIn() async {
-    print('🔐 Starting Google OAuth browser flow...');
-
+    _log.i('Google OAuth browser flow started');
     final success = await _supabase.auth.signInWithOAuth(
       OAuthProvider.google,
       redirectTo: 'apexrun://login-callback',
       authScreenLaunchMode: LaunchMode.externalApplication,
     );
-
     if (!success) {
       throw const AuthException('Failed to launch Google sign-in');
     }
-
-    print('✅ Google OAuth browser launched – waiting for redirect...');
-    // Return empty response; session arrives via deep link
+    _log.i('Google OAuth browser launched; awaiting redirect');
     return AuthResponse(session: null, user: null);
   }
 
-  /// Sign in with Apple (native flow)
-  ///
-  /// Uses SignInWithApple package for native sign-in, then exchanges the
-  /// authorization code with Supabase for a session.
   Future<AuthResponse> signInWithApple() async {
-    // Generate a random nonce for security
     final rawNonce = _generateNonce();
     final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
 
     final credential = await SignInWithApple.getAppleIDCredential(
-      scopes: [
+      scopes: const [
         AppleIDAuthorizationScopes.email,
         AppleIDAuthorizationScopes.fullName,
       ],
@@ -198,87 +157,69 @@ class AuthDataSource {
       throw const AuthException('Failed to get Apple ID token');
     }
 
-    final response = await _supabase.auth.signInWithIdToken(
+    return _supabase.auth.signInWithIdToken(
       provider: OAuthProvider.apple,
       idToken: idToken,
       nonce: rawNonce,
     );
-
-    return response;
   }
 
-  /// Generates a cryptographically-secure random nonce
   String _generateNonce([int length = 32]) {
     const charset =
         '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
     final random = Random.secure();
-    return List.generate(length, (_) => charset[random.nextInt(charset.length)])
-        .join();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
   }
 
-  /// Sign out
-  Future<void> signOut() async {
-    try {
-      await _supabase.auth.signOut();
-    } catch (e) {
-      rethrow;
-    }
-  }
+  Future<void> signOut() async => _supabase.auth.signOut();
 
-  /// Reset password
   Future<void> resetPassword({required String email}) async {
-    try {
-      await _supabase.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'apexrun://reset-password',
-      );
-    } catch (e) {
-      rethrow;
-    }
+    await _supabase.auth.resetPasswordForEmail(
+      email,
+      redirectTo: 'apexrun://reset-password',
+    );
   }
 
-  /// Update user password
   Future<UserResponse> updatePassword({required String newPassword}) async {
-    try {
-      final response = await _supabase.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
-      return response;
-    } catch (e) {
-      rethrow;
-    }
+    return _supabase.auth.updateUser(UserAttributes(password: newPassword));
   }
 
-  /// Update user metadata
   Future<UserResponse> updateUserMetadata({
     required Map<String, dynamic> metadata,
   }) async {
-    try {
-      final response = await _supabase.auth.updateUser(
-        UserAttributes(data: metadata),
-      );
-      return response;
-    } catch (e) {
-      rethrow;
-    }
+    return _supabase.auth.updateUser(UserAttributes(data: metadata));
   }
 
-  /// Refresh session
   Future<AuthResponse> refreshSession() async {
+    return _supabase.auth.refreshSession();
+  }
+
+  /// Permanently delete the current user account.
+  ///
+  /// Invokes a Supabase Edge Function `delete-account` that:
+  ///   1. Verifies the caller's JWT (must match `user_id` of the row to delete).
+  ///   2. Soft-deletes all owned rows (activities, segment_efforts, planned_workouts,
+  ///      user_profiles, friendships, etc.) — schedules a 30-day hard purge.
+  ///   3. Calls `supabase.auth.admin.deleteUser(uid)` server-side.
+  ///   4. Returns 204 on success.
+  ///
+  /// The client then signs out locally; no further requests will succeed.
+  Future<void> deleteAccount() async {
+    final user = currentUser;
+    if (user == null) {
+      throw const AuthException('Not signed in');
+    }
+    _log.w('Account deletion requested');
     try {
-      final response = await _supabase.auth.refreshSession();
-      return response;
-    } catch (e) {
+      await _supabase.functions.invoke('delete-account');
+      _log.w('Account deletion server call returned OK');
+      await _supabase.auth.signOut();
+    } catch (e, st) {
+      _log.e('Account deletion failed', error: e, stackTrace: st);
       rethrow;
     }
   }
 
-  /// Check if user is authenticated
-  bool get isAuthenticated => currentSession != null && currentUser != null;
-
-  /// Ensure a user profile exists after OAuth sign-in.
-  /// For Google/Apple sign-ins, Supabase creates the auth.users row
-  /// but the public.user_profiles row might not exist yet.
   Future<void> _ensureProfileExists(User? user) async {
     if (user == null) return;
     try {
@@ -296,11 +237,10 @@ class AuthDataSource {
           'avatar_url': meta?['avatar_url'] ?? meta?['picture'],
           'profile_completed': false,
         });
-        print('📋 Created user profile for Google user: ${user.id}');
+        _log.i('Auto-created user profile after OAuth');
       }
-    } catch (e) {
-      // Non-fatal — profile can be created later during onboarding
-      print('⚠️ Could not auto-create profile: $e');
+    } catch (e, st) {
+      _log.w('Could not auto-create profile (non-fatal)', error: e, stackTrace: st);
     }
   }
 }

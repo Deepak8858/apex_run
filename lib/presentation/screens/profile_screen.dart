@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/layout/responsive.dart';
 import '../../core/theme/app_theme.dart';
+import '../../domain/models/subscription_tier.dart';
 import '../../domain/models/user_profile.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../providers/app_providers.dart';
 import '../providers/step_tracking_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
 import 'activity_dashboard_screen.dart';
+import 'paywall_screen.dart';
 
 /// Profile Screen - User Settings and Profile
 ///
@@ -68,51 +74,61 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           if (_isEditing)
             IconButton(
-              icon: const Icon(Icons.check_rounded,
-                  color: AppTheme.electricLime),
+              icon: const Icon(
+                Icons.check_rounded,
+                color: AppTheme.electricLime,
+              ),
               onPressed: _saveProfile,
             ),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _buildProfileHeader(context, currentUser, profileAsync),
-              const SizedBox(height: 24),
-
-              if (_isEditing) ...[
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  child: _buildEditForm(context, profileAsync.valueOrNull),
-                ),
+        child: CappedWidth(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildProfileHeader(context, currentUser, profileAsync),
                 const SizedBox(height: 24),
-              ],
 
-              // Today's Activity Card
-              if (!_isEditing) ...[
-                _buildTodayActivityCard(context),
+                if (_isEditing) ...[
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    child: _buildEditForm(context, profileAsync.valueOrNull),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Today's Activity Card
+                if (!_isEditing) ...[
+                  _buildTodayActivityCard(context),
+                  const SizedBox(height: 24),
+                ],
+
+                _buildStatsRow(context, activityCount, weeklyStats),
                 const SizedBox(height: 24),
-              ],
 
-              _buildStatsRow(context, activityCount, weeklyStats),
-              const SizedBox(height: 24),
+                // Personal Info Section
+                if (!_isEditing) ...[
+                  _buildPersonalInfoSection(context, profileAsync),
+                  const SizedBox(height: 24),
+                ],
 
-              // Personal Info Section
-              if (!_isEditing) ...[
-                _buildPersonalInfoSection(context, profileAsync),
-                const SizedBox(height: 24),
+                if (!_isEditing) ...[
+                  _buildTierCard(context),
+                  const SizedBox(height: 24),
+                  _buildAchievementsRow(context),
+                  const SizedBox(height: 24),
+                  _buildReferralCard(context),
+                  const SizedBox(height: 24),
+                  _buildPreferencesSection(context, profileAsync),
+                  const SizedBox(height: 24),
+                  _buildSignOutButton(context),
+                ],
+                const SizedBox(height: 32),
               ],
-
-              if (!_isEditing) ...[
-                _buildPreferencesSection(context, profileAsync),
-                const SizedBox(height: 24),
-                _buildSignOutButton(context),
-              ],
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
         ),
       ),
@@ -145,14 +161,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: CircleAvatar(
             radius: 56,
             backgroundColor: AppTheme.cardBackground,
-            backgroundImage: profile?.avatarUrl != null &&
+            backgroundImage:
+                profile?.avatarUrl != null &&
                     profile!.avatarUrl!.startsWith('http')
                 ? NetworkImage(profile.avatarUrl!)
                 : null,
-            child: profile?.avatarUrl == null ||
+            child:
+                profile?.avatarUrl == null ||
                     !profile!.avatarUrl!.startsWith('http')
-                ? const Icon(Icons.person_rounded,
-                    size: 56, color: AppTheme.textSecondary)
+                ? const Icon(
+                    Icons.person_rounded,
+                    size: 56,
+                    color: AppTheme.textSecondary,
+                  )
                 : null,
           ),
         ),
@@ -160,19 +181,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Text(
           profile?.displayName ?? email?.split('@').first ?? 'Runner',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-                letterSpacing: -0.5,
-              ),
+            fontWeight: FontWeight.bold,
+            color: AppTheme.textPrimary,
+            letterSpacing: -0.5,
+          ),
         ),
         if (profile?.username != null) ...[
           const SizedBox(height: 4),
           Text(
             '@${profile!.username}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.electricLime,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: AppTheme.electricLime,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         if (email != null) ...[
@@ -186,9 +207,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Text(
               email,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textTertiary,
-                    fontWeight: FontWeight.w500,
-                  ),
+                color: AppTheme.textTertiary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -199,9 +220,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: Text(
               profile.bio!,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                    height: 1.5,
-                  ),
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
               textAlign: TextAlign.center,
             ),
           ),
@@ -227,9 +248,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(width: 12),
               Text(
                 'Edit Profile',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -237,7 +258,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextField(
             controller: _nameController,
             style: const TextStyle(color: AppTheme.textPrimary),
-            decoration: _inputDecoration('Display Name', Icons.person_outline_rounded),
+            decoration: _inputDecoration(
+              'Display Name',
+              Icons.person_outline_rounded,
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -251,16 +275,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             controller: _heightController,
             style: const TextStyle(color: AppTheme.textPrimary),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-            decoration: _inputDecoration('Height (cm)', Icons.height_rounded, suffix: 'cm'),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+            ],
+            decoration: _inputDecoration(
+              'Height (cm)',
+              Icons.height_rounded,
+              suffix: 'cm',
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _weightController,
             style: const TextStyle(color: AppTheme.textPrimary),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
-            decoration: _inputDecoration('Weight (kg)', Icons.monitor_weight_outlined, suffix: 'kg'),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.]')),
+            ],
+            decoration: _inputDecoration(
+              'Weight (kg)',
+              Icons.monitor_weight_outlined,
+              suffix: 'kg',
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -295,7 +331,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -305,7 +344,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, {String? suffix}) {
+  InputDecoration _inputDecoration(
+    String label,
+    IconData icon, {
+    String? suffix,
+  }) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: AppTheme.textSecondary),
@@ -347,18 +390,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.directions_walk_rounded,
-                    color: AppTheme.electricLime),
+                const Icon(
+                  Icons.directions_walk_rounded,
+                  color: AppTheme.electricLime,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Today\'s Activity',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const Spacer(),
-                const Icon(Icons.arrow_forward_ios_rounded,
-                    size: 16, color: AppTheme.textTertiary),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppTheme.textTertiary,
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -366,17 +414,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _MiniStat(
-                    icon: Icons.directions_walk_rounded,
-                    value: '${today.steps}',
-                    label: 'Steps'),
+                  icon: Icons.directions_walk_rounded,
+                  value: '${today.steps}',
+                  label: 'Steps',
+                ),
                 _MiniStat(
-                    icon: Icons.local_fire_department_rounded,
-                    value: today.formattedCalories,
-                    label: 'Cal'),
+                  icon: Icons.local_fire_department_rounded,
+                  value: today.formattedCalories,
+                  label: 'Cal',
+                ),
                 _MiniStat(
-                    icon: Icons.straighten_rounded,
-                    value: today.formattedDistance,
-                    label: 'Distance'),
+                  icon: Icons.straighten_rounded,
+                  value: today.formattedDistance,
+                  label: 'Distance',
+                ),
               ],
             ),
           ],
@@ -392,7 +443,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final profile = profileAsync.valueOrNull;
     if (profile == null) return const SizedBox();
 
-    final hasInfo = profile.heightCm != null ||
+    final hasInfo =
+        profile.heightCm != null ||
         profile.weightKg != null ||
         profile.age != null ||
         profile.gender != null ||
@@ -402,22 +454,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     String genderLabel(String? g) {
       switch (g) {
-        case 'male': return 'Male';
-        case 'female': return 'Female';
-        case 'other': return 'Other';
-        case 'prefer_not_to_say': return 'Not specified';
-        default: return '-';
+        case 'male':
+          return 'Male';
+        case 'female':
+          return 'Female';
+        case 'other':
+          return 'Other';
+        case 'prefer_not_to_say':
+          return 'Not specified';
+        default:
+          return '-';
       }
     }
 
     String goalLabel(String? g) {
       switch (g) {
-        case 'lose_weight': return 'Lose Weight';
-        case 'build_endurance': return 'Build Endurance';
-        case 'run_faster': return 'Run Faster';
-        case 'stay_active': return 'Stay Active';
-        case 'general_fitness': return 'General Fitness';
-        default: return '-';
+        case 'lose_weight':
+          return 'Lose Weight';
+        case 'build_endurance':
+          return 'Build Endurance';
+        case 'run_faster':
+          return 'Run Faster';
+        case 'stay_active':
+          return 'Stay Active';
+        case 'general_fitness':
+          return 'General Fitness';
+        default:
+          return '-';
       }
     }
 
@@ -434,22 +497,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             padding: const EdgeInsets.all(20),
             child: Text(
               'Personal Info',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           if (profile.heightCm != null)
-            _InfoRow(icon: Icons.height_rounded, label: 'Height', value: '${profile.heightCm!.toStringAsFixed(0)} cm'),
+            _InfoRow(
+              icon: Icons.height_rounded,
+              label: 'Height',
+              value: '${profile.heightCm!.toStringAsFixed(0)} cm',
+            ),
           if (profile.weightKg != null)
-            _InfoRow(icon: Icons.monitor_weight_outlined, label: 'Weight', value: '${profile.weightKg!.toStringAsFixed(0)} kg'),
+            _InfoRow(
+              icon: Icons.monitor_weight_outlined,
+              label: 'Weight',
+              value: '${profile.weightKg!.toStringAsFixed(0)} kg',
+            ),
           if (profile.age != null)
-            _InfoRow(icon: Icons.cake_rounded, label: 'Age', value: '${profile.age}'),
+            _InfoRow(
+              icon: Icons.cake_rounded,
+              label: 'Age',
+              value: '${profile.age}',
+            ),
           if (profile.gender != null)
-            _InfoRow(icon: Icons.person_rounded, label: 'Gender', value: genderLabel(profile.gender)),
+            _InfoRow(
+              icon: Icons.person_rounded,
+              label: 'Gender',
+              value: genderLabel(profile.gender),
+            ),
           if (profile.fitnessGoal != null)
-            _InfoRow(icon: Icons.emoji_events_rounded, label: 'Goal', value: goalLabel(profile.fitnessGoal)),
-          _InfoRow(icon: Icons.directions_walk_rounded, label: 'Step Goal', value: '${profile.dailyStepGoal}'),
+            _InfoRow(
+              icon: Icons.emoji_events_rounded,
+              label: 'Goal',
+              value: goalLabel(profile.fitnessGoal),
+            ),
+          _InfoRow(
+            icon: Icons.directions_walk_rounded,
+            label: 'Step Goal',
+            value: '${profile.dailyStepGoal}',
+          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -524,9 +611,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             padding: const EdgeInsets.all(20),
             child: Text(
               'Preferences',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
           ),
           _PreferenceRow(
@@ -558,32 +645,438 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildSignOutButton(BuildContext context) {
-    return SizedBox(
+  Widget _buildTierCard(BuildContext context) {
+    final entitlements =
+        ref.watch(entitlementsProvider).valueOrNull ?? Entitlements.free;
+    final tier = entitlements.tier;
+    final isPaid = tier.isPaid;
+
+    return Container(
       width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () async {
-          final messenger = ScaffoldMessenger.of(context);
-          try {
-            await ref.read(authStateProvider.notifier).signOut();
-            // AuthState change handles navigation
-          } catch (e) {
-            if (mounted) {
-              messenger.showSnackBar(
-                SnackBar(content: Text('Error: $e')),
-              );
-            }
-          }
-        },
-        icon: const Icon(Icons.logout_rounded),
-        label: const Text('Sign Out'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.error,
-          side: const BorderSide(color: AppTheme.error),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPaid
+              ? AppTheme.electricLime.withValues(alpha: 0.4)
+              : AppTheme.surfaceLight,
+          width: 1,
         ),
       ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: (isPaid ? AppTheme.electricLime : AppTheme.textTertiary)
+                  .withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              isPaid ? Icons.workspace_premium_rounded : Icons.shield_outlined,
+              color: isPaid ? AppTheme.electricLime : AppTheme.textSecondary,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tier.displayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isPaid
+                      ? 'Form analysis, AI plans, audio coach unlocked.'
+                      : 'Unlock form analysis, AI plans, audio coach.',
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () => _showPaywallStub(context, tier),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.electricLime,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: Text(isPaid ? 'Manage' : 'Upgrade'),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _showPaywallStub(BuildContext context, SubscriptionTier tier) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
+  }
+
+  Widget _buildReferralCard(BuildContext context) {
+    final codeAsync = ref.watch(myReferralCodeProvider);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.surfaceLight, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.card_giftcard_rounded,
+                color: AppTheme.electricLime,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Refer a friend',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Share your code. Both get 30 days of Apex Pro when they sign up.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          codeAsync.when(
+            data: (code) => code == null
+                ? const Text(
+                    'Sign in to generate your code.',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surfaceLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  code,
+                                  style: const TextStyle(
+                                    color: AppTheme.electricLime,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 4,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: code));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Code copied'),
+                                    ),
+                                  );
+                                },
+                                tooltip: 'Copy',
+                                icon: const Icon(
+                                  Icons.copy_rounded,
+                                  color: AppTheme.textSecondary,
+                                  size: 18,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () => _shareReferral(code),
+                        icon: const Icon(Icons.ios_share_rounded, size: 18),
+                        label: const Text('Share'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.electricLime,
+                          side: const BorderSide(color: AppTheme.electricLime),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+            loading: () => const SizedBox(
+              height: 48,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.electricLime,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+            error: (e, _) => Text(
+              'Code unavailable: $e',
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _redeemReferralDialog,
+            icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
+            label: const Text('Have a code? Redeem'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.electricLime,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _shareReferral(String code) async {
+    final url = ref.read(referralServiceProvider).shareUrlFor(code);
+    try {
+      await Share.share(
+        'Join me on Apex Run — your form, your physics, your pace. '
+        '30 days of Pro on the house: $url',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+    }
+  }
+
+  Future<void> _redeemReferralDialog() async {
+    final controller = TextEditingController();
+    final code = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: const Text('Redeem code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the 8-character code from your inviter.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLength: 12,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(hintText: 'ABCD1234'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.electricLime),
+            child: const Text('Redeem'),
+          ),
+        ],
+      ),
+    );
+    if (code == null || code.isEmpty || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(referralServiceProvider).redeem(code);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Redeemed — 30 days of Apex Pro unlocked'),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Widget _buildAchievementsRow(BuildContext context) {
+    final unlockedAsync = ref.watch(myAchievementsProvider);
+    final catalogAsync = ref.watch(achievementCatalogProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.surfaceLight, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.emoji_events_rounded,
+                color: AppTheme.electricLime,
+                size: 18,
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Achievements',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          unlockedAsync.when(
+            data: (unlocked) {
+              if (unlocked.isEmpty) {
+                return const Text(
+                  'No achievements yet — finish your first run to unlock.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                );
+              }
+              final catalog = catalogAsync.valueOrNull ?? const [];
+              final byCode = {for (final a in catalog) a.code: a};
+              return SizedBox(
+                height: 76,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: unlocked.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (_, i) {
+                    final u = unlocked[i];
+                    final meta = byCode[u.code];
+                    return _AchievementChip(
+                      label: meta?.name ?? u.code,
+                      rarity: meta?.rarity ?? 'common',
+                    );
+                  },
+                ),
+              );
+            },
+            loading: () => const SizedBox(
+              height: 76,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppTheme.electricLime,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+            error: (_, _) => const Text(
+              'Could not load achievements.',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            try {
+              await ref.read(authStateProvider.notifier).signOut();
+            } catch (e) {
+              if (mounted) {
+                messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            }
+          },
+          icon: const Icon(Icons.logout_rounded),
+          label: Text(AppLocalizations.of(context).signOut),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.error,
+            side: const BorderSide(color: AppTheme.error),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextButton.icon(
+          onPressed: _confirmDeleteAccount,
+          icon: const Icon(Icons.delete_forever_rounded, size: 18),
+          label: Text(AppLocalizations.of(context).deleteAccount),
+          style: TextButton.styleFrom(
+            foregroundColor: AppTheme.error,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDeleteAccount() async {
+    final l = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: Text(l.deleteAccountConfirmTitle),
+        content: Text(l.deleteAccountConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: Text(l.deleteAccountConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(authStateProvider.notifier).deleteAccount();
+      // Auth state change handles navigation back to login.
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Could not delete account: $e')),
+        );
+      }
+    }
   }
 
   void _startEditing(UserProfile? profile) {
@@ -602,7 +1095,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final weight = double.tryParse(_weightController.text.trim());
     final age = int.tryParse(_ageController.text.trim());
 
-    await ref.read(profileControllerProvider.notifier).updateProfile(
+    await ref
+        .read(profileControllerProvider.notifier)
+        .updateProfile(
           displayName: name.isNotEmpty ? name : null,
           bio: bio.isNotEmpty ? bio : null,
           heightCm: height,
@@ -611,24 +1106,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
     if (mounted) {
       setState(() => _isEditing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
     }
   }
 
   void _toggleDistanceUnit(UserProfile? profile) {
     final current = profile?.preferredDistanceUnit ?? 'km';
-    ref.read(profileControllerProvider.notifier).updateProfile(
-          preferredDistanceUnit: current == 'km' ? 'mi' : 'km',
-        );
+    ref
+        .read(profileControllerProvider.notifier)
+        .updateProfile(preferredDistanceUnit: current == 'km' ? 'mi' : 'km');
   }
 
   void _togglePaceFormat(UserProfile? profile) {
     final current = profile?.preferredPaceFormat ?? 'min_per_km';
-    ref.read(profileControllerProvider.notifier).updateProfile(
-          preferredPaceFormat:
-              current == 'min_per_km' ? 'min_per_mi' : 'min_per_km',
+    ref
+        .read(profileControllerProvider.notifier)
+        .updateProfile(
+          preferredPaceFormat: current == 'min_per_km'
+              ? 'min_per_mi'
+              : 'min_per_km',
         );
   }
 
@@ -649,19 +1147,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
-            ...options.map((m) => ListTile(
-                  leading: Icon(
-                    m == current ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    color: m == current ? AppTheme.electricLime : AppTheme.textTertiary,
-                  ),
-                  title: Text('${m}m'),
-                  onTap: () {
-                    ref
-                        .read(profileControllerProvider.notifier)
-                        .updateProfile(privacyRadiusMeters: m);
-                    Navigator.pop(ctx);
-                  },
-                )),
+            ...options.map(
+              (m) => ListTile(
+                leading: Icon(
+                  m == current
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  color: m == current
+                      ? AppTheme.electricLime
+                      : AppTheme.textTertiary,
+                ),
+                title: Text('${m}m'),
+                onTap: () {
+                  ref
+                      .read(profileControllerProvider.notifier)
+                      .updateProfile(privacyRadiusMeters: m);
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -708,10 +1212,10 @@ class _StatCard extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                ),
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -757,13 +1261,16 @@ class _PreferenceRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.surfaceLight,
                   borderRadius: BorderRadius.circular(8),
@@ -771,9 +1278,9 @@ class _PreferenceRow extends StatelessWidget {
                 child: Text(
                   value,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.electricLime,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: AppTheme.electricLime,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -810,10 +1317,7 @@ class _MiniStat extends StatelessWidget {
         ),
         Text(
           label,
-          style: const TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 11,
-          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
         ),
       ],
     );
@@ -841,17 +1345,65 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondary,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
             ),
           ),
           Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact chip for unlocked achievements in the profile achievements row.
+class _AchievementChip extends StatelessWidget {
+  const _AchievementChip({required this.label, required this.rarity});
+
+  final String label;
+  final String rarity;
+
+  Color _accent() => switch (rarity) {
+    'legendary' => const Color(0xFFFFD166),
+    'epic' => const Color(0xFFB8A4FF),
+    'rare' => const Color(0xFF7AD3FF),
+    _ => AppTheme.electricLime,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _accent();
+    return Container(
+      width: 92,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.45), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.emoji_events_rounded, color: accent, size: 18),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+            ),
           ),
         ],
       ),

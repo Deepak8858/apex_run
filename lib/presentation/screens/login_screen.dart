@@ -1,8 +1,12 @@
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/logger/app_logger.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../providers/auth_provider.dart';
+
+final _log = AppLogger.tag('Login');
 
 /// Login Screen - Email/Password and Social Auth
 class LoginScreen extends ConsumerStatefulWidget {
@@ -29,20 +33,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleEmailAuth() async {
     if (!_formKey.currentState!.validate()) return;
 
-    print('👆 Login button pressed - isSignUp: $_isSignUp');
+    _log.i('Login button pressed (isSignUp=$_isSignUp)');
     setState(() => _isLoading = true);
 
     try {
       final authNotifier = ref.read(authStateProvider.notifier);
 
       if (_isSignUp) {
-        print('📝 Calling signUpWithEmail');
         await authNotifier.signUpWithEmail(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
       } else {
-        print('🔐 Calling signInWithEmail');
         await authNotifier.signInWithEmail(
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -50,15 +52,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
 
       if (mounted) {
-        print('✅ Auth successful - showing success message');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isSignUp ? 'Account created!' : 'Welcome back!'),
           ),
         );
       }
-    } catch (e) {
-      print('❌ Auth error in login screen: $e');
+    } catch (e, st) {
+      _log.e('Login screen auth error', error: e, stackTrace: st);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -71,6 +72,79 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final l = AppLocalizations.of(context);
+    final controller = TextEditingController(text: _emailController.text);
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBackground,
+        title: Text(l.resetPasswordTitle),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l.resetPasswordBody,
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              decoration: const InputDecoration(hintText: 'you@example.com'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: Text(l.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.electricLime),
+            child: Text(l.sendLink),
+          ),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty) return;
+
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(authStateProvider.notifier).resetPassword(email: email);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('If an account exists, a reset link has been sent.'),
+        ),
+      );
+    } catch (e, st) {
+      _log.w('Reset password failed', error: e, stackTrace: st);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not send reset email: $e'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -158,27 +232,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Text(
                       'ApexRun',
                       style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.0,
-                            color: Colors.white,
-                          ),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.0,
+                        color: Colors.white,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'PEAK PERFORMANCE',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textTertiary,
-                            letterSpacing: 4.0,
-                            fontWeight: FontWeight.w500,
-                          ),
+                        color: AppTheme.textTertiary,
+                        letterSpacing: 4.0,
+                        fontWeight: FontWeight.w500,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
 
                     // Social Auth Buttons First (Strava-like priority)
                     _BrandedAuthButton(
-                      label: 'Continue with Google',
+                      label: AppLocalizations.of(context).continueWithGoogle,
                       iconWidget: Container(
                         width: 20,
                         height: 20,
@@ -187,29 +261,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Center(
-                          child: Text('G',
-                              style: TextStyle(
-                                color: Color(0xFF4285F4),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                              )),
+                          child: Text(
+                            'G',
+                            style: TextStyle(
+                              color: Color(0xFF4285F4),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                       backgroundColor: const Color(0xFF1A1A1A),
                       borderColor: AppTheme.surfaceLight,
                       textColor: AppTheme.textPrimary,
-                      onPressed: _isLoading ? null : () => _handleOAuthSignIn('google'),
+                      onPressed: _isLoading
+                          ? null
+                          : () => _handleOAuthSignIn('google'),
                     ),
                     if (Platform.isIOS) ...[
                       const SizedBox(height: 12),
                       _BrandedAuthButton(
-                        label: 'Continue with Apple',
-                        iconWidget: const Icon(Icons.apple_rounded,
-                            size: 22, color: Colors.white),
+                        label: AppLocalizations.of(context).continueWithApple,
+                        iconWidget: const Icon(
+                          Icons.apple_rounded,
+                          size: 22,
+                          color: Colors.white,
+                        ),
                         backgroundColor: Colors.white.withValues(alpha: 0.08),
                         borderColor: AppTheme.surfaceLight,
                         textColor: AppTheme.textPrimary,
-                        onPressed: _isLoading ? null : () => _handleOAuthSignIn('apple'),
+                        onPressed: _isLoading
+                            ? null
+                            : () => _handleOAuthSignIn('apple'),
                       ),
                     ],
                     const SizedBox(height: 28),
@@ -217,17 +300,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     // Divider
                     Row(
                       children: [
-                        Expanded(child: Container(height: 1, color: AppTheme.surfaceLight)),
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: AppTheme.surfaceLight,
+                          ),
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text('or sign in with email',
-                              style: TextStyle(
-                                color: AppTheme.textTertiary,
-                                fontSize: 12,
-                                letterSpacing: 0.5,
-                              )),
+                          child: Text(
+                            'or sign in with email',
+                            style: TextStyle(
+                              color: AppTheme.textTertiary,
+                              fontSize: 12,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                        Expanded(child: Container(height: 1, color: AppTheme.surfaceLight)),
+                        Expanded(
+                          child: Container(
+                            height: 1,
+                            color: AppTheme.surfaceLight,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -238,10 +333,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Email',
-                        hintStyle: const TextStyle(color: AppTheme.textTertiary),
-                        prefixIcon: const Icon(Icons.email_outlined,
-                            color: AppTheme.textTertiary, size: 20),
+                        hintText: AppLocalizations.of(context).emailHint,
+                        hintStyle: const TextStyle(
+                          color: AppTheme.textTertiary,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.email_outlined,
+                          color: AppTheme.textTertiary,
+                          size: 20,
+                        ),
                         filled: true,
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
@@ -251,15 +351,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(
-                              color: AppTheme.surfaceLight, width: 1),
+                            color: AppTheme.surfaceLight,
+                            width: 1,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(
-                              color: AppTheme.electricLime, width: 1.5),
+                            color: AppTheme.electricLime,
+                            width: 1.5,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 16),
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -279,10 +385,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       obscureText: true,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: const TextStyle(color: AppTheme.textTertiary),
-                        prefixIcon: const Icon(Icons.lock_outline_rounded,
-                            color: AppTheme.textTertiary, size: 20),
+                        hintText: AppLocalizations.of(context).passwordHint,
+                        hintStyle: const TextStyle(
+                          color: AppTheme.textTertiary,
+                        ),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: AppTheme.textTertiary,
+                          size: 20,
+                        ),
                         filled: true,
                         fillColor: AppTheme.cardBackground,
                         border: OutlineInputBorder(
@@ -292,15 +403,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(
-                              color: AppTheme.surfaceLight, width: 1),
+                            color: AppTheme.surfaceLight,
+                            width: 1,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: const BorderSide(
-                              color: AppTheme.electricLime, width: 1.5),
+                            color: AppTheme.electricLime,
+                            width: 1.5,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 16),
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -312,7 +429,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+
+                    // Forgot password (hidden during sign-up)
+                    if (!_isSignUp)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _isLoading ? null : _handleForgotPassword,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.electricLime,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                          ),
+                          child: Text(
+                            AppLocalizations.of(context).forgotPassword,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
 
                     // Sign In/Sign Up Button
                     SizedBox(
@@ -357,12 +495,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: RichText(
                         text: TextSpan(
                           style: const TextStyle(
-                              color: AppTheme.textTertiary, fontSize: 14),
+                            color: AppTheme.textTertiary,
+                            fontSize: 14,
+                          ),
                           children: [
                             TextSpan(
-                                text: _isSignUp
-                                    ? 'Already have an account? '
-                                    : 'Don\'t have an account? '),
+                              text: _isSignUp
+                                  ? 'Already have an account? '
+                                  : 'Don\'t have an account? ',
+                            ),
                             TextSpan(
                               text: _isSignUp ? 'Sign In' : 'Sign Up',
                               style: const TextStyle(

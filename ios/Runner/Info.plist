@@ -76,10 +76,34 @@
 	<string>ApexRun needs background location access to keep tracking your run when the screen is off or another app is open.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>ApexRun needs background location access to keep tracking your run when the screen is off.</string>
-	<!-- Background modes -->
+	<!-- Camera permission (MediaPipe pose / form analysis) -->
+	<key>NSCameraUsageDescription</key>
+	<string>ApexRun uses the camera to analyze your running form and gait. Frames are processed on-device and never uploaded.</string>
+	<!-- Motion / pedometer -->
+	<key>NSMotionUsageDescription</key>
+	<string>ApexRun reads device motion data to count your steps and detect running cadence.</string>
+	<!-- Health (HRV, sleep, heart rate via HealthKit) -->
+	<key>NSHealthShareUsageDescription</key>
+	<string>ApexRun reads heart rate, HRV, and sleep data from Apple Health to personalize your training and recovery recommendations.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>ApexRun writes workout summaries to Apple Health so your activity stays synced across the fitness ecosystem.</string>
+	<!-- Photo library (avatar upload + activity sharing) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ApexRun saves your generated activity highlight images to your photo library when you tap Save.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ApexRun saves your generated activity highlight images to your photo library when you tap Save.</string>
+	<!-- Speech / TTS for audio coach -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>ApexRun uses speech recognition for hands-free coaching interactions during your runs.</string>
+	<!-- Background modes: location keeps GPS tracking alive, audio keeps coach announcements running -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<string>audio</string>
+		<string>processing</string>
 	</array>
+	<!-- Encryption export compliance: no proprietary crypto -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

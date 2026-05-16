@@ -74,6 +74,16 @@ backend/service-account.json
 .env.local
 .env.production
 .env.*.local
+.env.json
+.env.*.json
+!.env.example.json
+
+# Mapbox SDK download token (per-user, in ~/.gradle/gradle.properties)
+mapbox.properties
+
+# Local-only gradle overrides
+android/local.properties
+android/gradle.properties.local
 
 # IDE
 .vscode/

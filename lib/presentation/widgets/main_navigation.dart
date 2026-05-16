@@ -1,10 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/logger/app_logger.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/services/deep_link_service.dart';
+import '../../l10n/generated/app_localizations.dart';
+import '../providers/app_providers.dart';
+import '../screens/activity_feed_screen.dart';
+import '../screens/challenges_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/record_screen.dart';
-import '../screens/coach_screen.dart';
-import '../screens/leaderboard_screen.dart';
 import '../screens/profile_screen.dart';
 
 /// Main Navigation with Custom Bottom Navigation Bar
@@ -15,23 +22,88 @@ import '../screens/profile_screen.dart';
 /// 3. AI Coach - Gemini-powered coaching and workout plans
 /// 4. Leaderboard - Segment leaderboards and competitions
 /// 5. Profile - User settings and profile management
-class MainNavigation extends StatefulWidget {
+class MainNavigation extends ConsumerStatefulWidget {
   const MainNavigation({super.key});
 
   @override
-  State<MainNavigation> createState() => _MainNavigationState();
+  ConsumerState<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends ConsumerState<MainNavigation> {
   int _currentIndex = 0;
 
+  /// Tab order (Phase 5): Home / Feed / Record / Challenges / Profile.
+  /// Coach + Leaderboard are reachable from Home cards and segment detail.
   final List<Widget> _screens = const [
     HomeScreen(),
+    ActivityFeedScreen(),
     RecordScreen(),
-    CoachScreen(),
-    LeaderboardScreen(),
+    ChallengesScreen(),
     ProfileScreen(),
   ];
+
+  StreamSubscription<DeepLinkAction>? _deepLinkSub;
+  final _log = AppLogger.tag('Nav');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notif = ref.read(notificationServiceProvider);
+      await notif.init();
+      await ref.read(audioCoachServiceProvider).init();
+
+      final profile = await ref.read(userProfileProvider.future);
+      if (profile != null && profile.streakDays >= 3) {
+        await notif.scheduleStreakWarning(currentStreak: profile.streakDays);
+      }
+
+      // Deep link subscription (referrals, friend invites, activity share).
+      final deepLink = ref.read(deepLinkServiceProvider);
+      await deepLink.init();
+      _deepLinkSub = deepLink.stream.listen(_handleDeepLink);
+    });
+  }
+
+  @override
+  void dispose() {
+    _deepLinkSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _handleDeepLink(DeepLinkAction action) async {
+    if (!mounted) return;
+    switch (action.kind) {
+      case DeepLinkKind.referral:
+        final code = action.value!;
+        try {
+          await ref.read(referralServiceProvider).redeem(code);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Referral redeemed — 30 days of Apex Pro unlocked'),
+            ),
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$e')));
+        }
+        break;
+      case DeepLinkKind.activity:
+        _log.i('Activity deep link ignored (no router yet): ${action.value}');
+        break;
+      case DeepLinkKind.challenge:
+        // Switch to the Challenges tab.
+        setState(() => _currentIndex = 3);
+        break;
+      case DeepLinkKind.friend:
+        // Switch to the Feed tab (friends list lives in the feed app bar).
+        setState(() => _currentIndex = 1);
+        break;
+    }
+  }
 
   void _onTabTapped(int index) {
     HapticFeedback.selectionClick();
@@ -43,10 +115,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       extendBody: true,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -67,30 +136,30 @@ class _MainNavigationState extends State<MainNavigation> {
               children: [
                 _NavItem(
                   icon: Icons.home_rounded,
-                  label: 'Home',
+                  label: AppLocalizations.of(context).navHome,
                   isSelected: _currentIndex == 0,
                   onTap: () => _onTabTapped(0),
                 ),
                 _NavItem(
-                  icon: Icons.psychology_rounded,
-                  label: 'Coach',
-                  isSelected: _currentIndex == 2,
-                  onTap: () => _onTabTapped(2),
-                ),
-                // Center Record button (elevated)
-                _RecordNavButton(
+                  icon: Icons.people_alt_rounded,
+                  label: AppLocalizations.of(context).navFeed,
                   isSelected: _currentIndex == 1,
                   onTap: () => _onTabTapped(1),
                 ),
+                // Center Record button (elevated)
+                _RecordNavButton(
+                  isSelected: _currentIndex == 2,
+                  onTap: () => _onTabTapped(2),
+                ),
                 _NavItem(
-                  icon: Icons.leaderboard_rounded,
-                  label: 'Segments',
+                  icon: Icons.flag_rounded,
+                  label: AppLocalizations.of(context).navChallenges,
                   isSelected: _currentIndex == 3,
                   onTap: () => _onTabTapped(3),
                 ),
                 _NavItem(
                   icon: Icons.person_rounded,
-                  label: 'Profile',
+                  label: AppLocalizations.of(context).navProfile,
                   isSelected: _currentIndex == 4,
                   onTap: () => _onTabTapped(4),
                 ),
@@ -138,7 +207,9 @@ class _NavItem extends StatelessWidget {
               child: Icon(
                 icon,
                 size: 22,
-                color: isSelected ? AppTheme.electricLime : AppTheme.textTertiary,
+                color: isSelected
+                    ? AppTheme.electricLime
+                    : AppTheme.textTertiary,
               ),
             ),
             const SizedBox(height: 2),
@@ -147,7 +218,9 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppTheme.electricLime : AppTheme.textTertiary,
+                color: isSelected
+                    ? AppTheme.electricLime
+                    : AppTheme.textTertiary,
                 letterSpacing: 0.2,
               ),
             ),
@@ -162,10 +235,7 @@ class _RecordNavButton extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _RecordNavButton({
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _RecordNavButton({required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +250,10 @@ class _RecordNavButton extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isSelected
-                ? [AppTheme.electricLime, AppTheme.electricLime.withValues(alpha: 0.8)]
+                ? [
+                    AppTheme.electricLime,
+                    AppTheme.electricLime.withValues(alpha: 0.8),
+                  ]
                 : [AppTheme.surfaceLight, AppTheme.surfaceLight],
           ),
           boxShadow: isSelected

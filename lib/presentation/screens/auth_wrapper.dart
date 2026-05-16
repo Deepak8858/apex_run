@@ -1,80 +1,101 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../providers/auth_provider.dart';
 import '../providers/onboarding_provider.dart';
+import '../widgets/main_navigation.dart';
 import 'login_screen.dart';
 import 'onboarding_profile_screen.dart';
 import 'permission_screen.dart';
-import '../widgets/main_navigation.dart';
+import 'value_prop_screen.dart';
 
-/// Whether permission onboarding has been completed
-final _permissionsCompletedProvider = FutureProvider<bool>((ref) async {
+/// Onboarding flags persisted in shared_preferences.
+const _kValuePropSeenKey = 'value_prop_seen';
+const _kPermissionsCompletedKey = 'permissions_completed';
+
+final _valuePropSeenProvider = FutureProvider<bool>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  return prefs.getBool('permissions_completed') ?? false;
+  return prefs.getBool(_kValuePropSeenKey) ?? false;
 });
 
-/// Auth Wrapper - Routes to login, onboarding, permission screen, or main app
+final _permissionsCompletedProvider = FutureProvider<bool>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(_kPermissionsCompletedKey) ?? false;
+});
+
+/// First-launch flow:
+///   1. ValuePropScreen        (one-time, before auth)
+///   2. PermissionScreen       (one-time, before auth — soft asks)
+///   3. LoginScreen            (auth)
+///   4. OnboardingProfileScreen (per-account, once)
+///   5. MainNavigation         (main app)
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
+    final valuePropSeen = ref.watch(_valuePropSeenProvider);
+    final permsDone = ref.watch(_permissionsCompletedProvider);
 
-    // Show loading while checking auth state
-    if (authState == AuthStatus.initial || authState == AuthStatus.loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Not authenticated — show login
-    if (authState != AuthStatus.authenticated) {
-      return const LoginScreen();
-    }
-
-    // Authenticated — check if profile onboarding is complete
-    final profileCompleted = ref.watch(profileCompletedProvider);
-
-    return profileCompleted.when(
-      data: (completed) {
-        if (!completed) {
-          // Show onboarding screen
-          return OnboardingProfileScreen(
-            onComplete: () {
-              ref.invalidate(profileCompletedProvider);
+    return valuePropSeen.when(
+      loading: _loading,
+      error: (_, _) => _loading(),
+      data: (seen) {
+        if (!seen) {
+          return ValuePropScreen(
+            onContinue: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool(_kValuePropSeenKey, true);
+              ref.invalidate(_valuePropSeenProvider);
             },
           );
         }
 
-        // Profile complete — check permissions
-        final permsDone = ref.watch(_permissionsCompletedProvider);
         return permsDone.when(
+          loading: _loading,
+          error: (_, _) => _loading(),
           data: (done) {
             if (!done) {
               return PermissionScreen(
                 onComplete: () async {
                   final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('permissions_completed', true);
+                  await prefs.setBool(_kPermissionsCompletedKey, true);
                   ref.invalidate(_permissionsCompletedProvider);
                 },
               );
             }
-            return const MainNavigation();
+
+            // Permissions handled. Now check auth.
+            final authState = ref.watch(authStateProvider);
+            if (authState == AuthStatus.initial ||
+                authState == AuthStatus.loading) {
+              return _loading();
+            }
+            if (authState != AuthStatus.authenticated) {
+              return const LoginScreen();
+            }
+
+            // Authenticated — check per-account profile completion.
+            final profileCompleted = ref.watch(profileCompletedProvider);
+            return profileCompleted.when(
+              loading: _loading,
+              error: (_, _) => const MainNavigation(),
+              data: (completed) {
+                if (!completed) {
+                  return OnboardingProfileScreen(
+                    onComplete: () => ref.invalidate(profileCompletedProvider),
+                  );
+                }
+                return const MainNavigation();
+              },
+            );
           },
-          loading: () => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          ),
-          error: (_, s) => const MainNavigation(),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (_, s) => const MainNavigation(),
     );
   }
+
+  static Widget _loading() =>
+      const Scaffold(body: Center(child: CircularProgressIndicator()));
 }

@@ -1,8 +1,17 @@
 #!/usr/bin/env pwsh
 # ApexRun Mock Data Seeder
 
-$SUPABASE_URL = "https://voddddmmiarnbvwmgzgo.supabase.co"
-$ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvZGRkZG1taWFybmJ2d21nemdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2NTE3OTcsImV4cCI6MjA4NjIyNzc5N30.i7Ni-NHsmbwaXEoyOut_26PH1PK_Xycw3ChzkvPtklM"
+# Credentials are pulled from environment variables. NEVER hardcode here.
+# Set them before running:
+#   $env:SUPABASE_URL = "https://your-project.supabase.co"
+#   $env:SUPABASE_ANON_KEY = "your-anon-key"
+$SUPABASE_URL = $env:SUPABASE_URL
+$ANON_KEY = $env:SUPABASE_ANON_KEY
+
+if ([string]::IsNullOrEmpty($SUPABASE_URL) -or [string]::IsNullOrEmpty($ANON_KEY)) {
+    Write-Error "SUPABASE_URL and SUPABASE_ANON_KEY env vars must be set. See SECURITY_ROTATION.md."
+    exit 1
+}
 
 function Login-User($email, $password) {
     $body = @{ email = $email; password = $password } | ConvertTo-Json

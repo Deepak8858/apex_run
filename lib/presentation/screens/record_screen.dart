@@ -1,9 +1,12 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/permission_utils.dart';
+import '../../domain/models/activity.dart';
 import '../../domain/models/tracking_metrics.dart';
+import '../providers/app_providers.dart';
 import '../providers/tracking_provider.dart';
 import '../widgets/route_map_widget.dart';
 import 'activity_detail_screen.dart';
@@ -27,8 +30,9 @@ class RecordScreen extends ConsumerStatefulWidget {
 
 class _RecordScreenState extends ConsumerState<RecordScreen>
     with TickerProviderStateMixin {
-  final TextEditingController _activityNameController =
-      TextEditingController(text: 'Morning Run');
+  final TextEditingController _activityNameController = TextEditingController(
+    text: 'Morning Run',
+  );
 
   late AnimationController _pulseController;
   late AnimationController _startButtonController;
@@ -81,8 +85,37 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
     final controllerState = ref.watch(trackingControllerProvider);
     final metrics = ref.watch(trackingMetricsProvider);
 
-    ref.listen<TrackingControllerState>(trackingControllerProvider, (prev, next) {
+    ref.listen<TrackingControllerState>(trackingControllerProvider, (
+      prev,
+      next,
+    ) {
+      // ── Audio coach state transitions ───────────────────────────────
+      final coach = ref.read(audioCoachServiceProvider);
+      final prevState = prev?.trackingState;
+      final nextState = next.trackingState;
+      if (prevState != nextState) {
+        switch (nextState) {
+          case TrackingState.tracking:
+            if (prevState == null || prevState == TrackingState.idle) {
+              coach.resetForNewSession();
+              coach.announceStart();
+              HapticFeedback.heavyImpact();
+            } else if (prevState == TrackingState.paused) {
+              coach.announceResume();
+              HapticFeedback.lightImpact();
+            }
+            break;
+          case TrackingState.paused:
+            coach.announcePause();
+            HapticFeedback.mediumImpact();
+            break;
+          case TrackingState.idle:
+            break;
+        }
+      }
+
       if (next.lastSavedActivity != null && prev?.lastSavedActivity == null) {
+        HapticFeedback.heavyImpact();
         _showActivitySavedSheet(context, next);
       }
       if (next.errorMessage != null && prev?.errorMessage == null) {
@@ -91,9 +124,24 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             content: Text(next.errorMessage!),
             backgroundColor: AppTheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
+      }
+    });
+
+    // Per-km / per-mile split announcer. Fires on every metric tick but
+    // [AudioCoachService.maybeAnnounceSplit] gates by whole-unit crossings.
+    ref.listen<AsyncValue<TrackingMetrics>>(trackingMetricsProvider, (
+      prev,
+      next,
+    ) {
+      final m = next.valueOrNull;
+      if (m == null) return;
+      if (m.state == TrackingState.tracking) {
+        ref.read(audioCoachServiceProvider).maybeAnnounceSplit(m);
       }
     });
 
@@ -118,11 +166,13 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
-                  Text('Record',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.5,
-                          )),
+                  Text(
+                    'Record',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                   const Spacer(),
                   const _GpsSignalIndicator(),
                 ],
@@ -160,9 +210,16 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
                   controller: _activityNameController,
-                  style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                  ),
                   decoration: const InputDecoration(
-                    icon: Icon(Icons.edit_outlined, size: 18, color: AppTheme.textTertiary),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: AppTheme.textTertiary,
+                    ),
                     hintText: 'Name your activity',
                     hintStyle: TextStyle(color: AppTheme.textTertiary),
                     border: InputBorder.none,
@@ -176,10 +233,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             const SizedBox(height: 16),
             Text(
               'Tap to start ${_activityTypes[_selectedActivityType].name.toLowerCase()}',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.textTertiary),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textTertiary),
             ),
             const SizedBox(height: 48),
           ],
@@ -213,8 +269,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: AppTheme.electricLime
-                        .withValues(alpha: 0.12 * (1.0 - _pulseAnimation.value + 0.5)),
+                    color: AppTheme.electricLime.withValues(
+                      alpha: 0.12 * (1.0 - _pulseAnimation.value + 0.5),
+                    ),
                     width: 2,
                   ),
                 ),
@@ -245,14 +302,20 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.play_arrow_rounded, size: 48, color: AppTheme.background),
-                  Text('START',
-                      style: TextStyle(
-                        color: AppTheme.background,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 2.0,
-                      )),
+                  Icon(
+                    Icons.play_arrow_rounded,
+                    size: 48,
+                    color: AppTheme.background,
+                  ),
+                  Text(
+                    'START',
+                    style: TextStyle(
+                      color: AppTheme.background,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2.0,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -284,7 +347,12 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             child: RouteMapWidget(
               routePoints: metrics.routePoints,
               isLiveTracking: true,
-              padding: const EdgeInsets.only(top: 80, bottom: 380, left: 40, right: 40),
+              padding: const EdgeInsets.only(
+                top: 80,
+                bottom: 380,
+                left: 40,
+                right: 40,
+              ),
             ),
           ),
           // Bottom gradient overlay
@@ -316,11 +384,17 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: (isPaused ? AppTheme.warning : AppTheme.success)
                             .withValues(alpha: 0.2),
@@ -334,14 +408,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                             height: 8,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isPaused ? AppTheme.warning : AppTheme.success,
+                              color: isPaused
+                                  ? AppTheme.warning
+                                  : AppTheme.success,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             isPaused ? 'PAUSED' : 'REC',
                             style: TextStyle(
-                              color: isPaused ? AppTheme.warning : AppTheme.success,
+                              color: isPaused
+                                  ? AppTheme.warning
+                                  : AppTheme.success,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 1.5,
@@ -363,8 +441,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                           shape: BoxShape.circle,
                           color: AppTheme.surfaceLight.withValues(alpha: 0.6),
                         ),
-                        child: const Icon(Icons.lock_open_rounded,
-                            size: 18, color: AppTheme.textSecondary),
+                        child: const Icon(
+                          Icons.lock_open_rounded,
+                          size: 18,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -389,7 +470,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
     );
   }
 
-  Widget _buildMetricsOverlay(BuildContext context, TrackingMetrics metrics, bool isPaused) {
+  Widget _buildMetricsOverlay(
+    BuildContext context,
+    TrackingMetrics metrics,
+    bool isPaused,
+  ) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -405,13 +490,15 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           ),
         ),
         const SizedBox(height: 2),
-        Text('Duration',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textTertiary,
-              letterSpacing: 1.5,
-              fontWeight: FontWeight.w500,
-            )),
+        Text(
+          'Duration',
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.textTertiary,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         const SizedBox(height: 16),
         // Swipeable metric panels
         SizedBox(
@@ -421,16 +508,32 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             onPageChanged: (i) => setState(() => _currentMetricPage = i),
             children: [
               _MetricRow(
-                left: _MetricInfo('Distance', metrics.formattedDistance,
-                    metrics.distanceUnit, AppTheme.distance),
-                right: _MetricInfo('Avg Pace', metrics.formattedPace,
-                    'min/km', AppTheme.pace),
+                left: _MetricInfo(
+                  'Distance',
+                  metrics.formattedDistance,
+                  metrics.distanceUnit,
+                  AppTheme.distance,
+                ),
+                right: _MetricInfo(
+                  'Avg Pace',
+                  metrics.formattedPace,
+                  'min/km',
+                  AppTheme.pace,
+                ),
               ),
               _MetricRow(
-                left: _MetricInfo('Speed',
-                    metrics.currentSpeedKmh.toStringAsFixed(1), 'km/h', AppTheme.elevation),
-                right: _MetricInfo('GPS Points',
-                    '${metrics.routePoints.length}', 'pts', AppTheme.info),
+                left: _MetricInfo(
+                  'Speed',
+                  metrics.currentSpeedKmh.toStringAsFixed(1),
+                  'km/h',
+                  AppTheme.elevation,
+                ),
+                right: _MetricInfo(
+                  'GPS Points',
+                  '${metrics.routePoints.length}',
+                  'pts',
+                  AppTheme.info,
+                ),
               ),
             ],
           ),
@@ -491,7 +594,9 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           _FinishButton(
             onFinish: () {
               HapticFeedback.heavyImpact();
-              ref.read(trackingControllerProvider.notifier).stopAndSaveTracking();
+              ref
+                  .read(trackingControllerProvider.notifier)
+                  .stopAndSaveTracking();
             },
           ),
         ],
@@ -502,7 +607,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   // ============================================================
   // LOCKED VIEW
   // ============================================================
-  Widget _buildLockedView(BuildContext context, TrackingMetrics metrics, bool isPaused) {
+  Widget _buildLockedView(
+    BuildContext context,
+    TrackingMetrics metrics,
+    bool isPaused,
+  ) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: GestureDetector(
@@ -530,16 +639,25 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LockedMetric(value: metrics.formattedDistance, unit: metrics.distanceUnit),
+                    _LockedMetric(
+                      value: metrics.formattedDistance,
+                      unit: metrics.distanceUnit,
+                    ),
                     const SizedBox(width: 32),
                     _LockedMetric(value: metrics.formattedPace, unit: 'min/km'),
                   ],
                 ),
                 const Spacer(),
-                const Icon(Icons.lock_rounded, size: 40, color: AppTheme.textTertiary),
+                const Icon(
+                  Icons.lock_rounded,
+                  size: 40,
+                  color: AppTheme.textTertiary,
+                ),
                 const SizedBox(height: 12),
-                const Text('Long press to unlock',
-                    style: TextStyle(color: AppTheme.textTertiary, fontSize: 14)),
+                const Text(
+                  'Long press to unlock',
+                  style: TextStyle(color: AppTheme.textTertiary, fontSize: 14),
+                ),
                 const SizedBox(height: 48),
               ],
             ),
@@ -562,14 +680,18 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             const SizedBox(
               width: 56,
               height: 56,
-              child: CircularProgressIndicator(color: AppTheme.electricLime, strokeWidth: 3),
+              child: CircularProgressIndicator(
+                color: AppTheme.electricLime,
+                strokeWidth: 3,
+              ),
             ),
             const SizedBox(height: 24),
-            Text('Saving activity...',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: AppTheme.textSecondary)),
+            Text(
+              'Saving activity...',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
+            ),
           ],
         ),
       ),
@@ -585,11 +707,13 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(children: [
-          Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 24),
-          SizedBox(width: 8),
-          Text('Discard Activity?'),
-        ]),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline_rounded, color: AppTheme.error, size: 24),
+            SizedBox(width: 8),
+            Text('Discard Activity?'),
+          ],
+        ),
         content: const Text(
           'All recorded data will be permanently deleted.',
           style: TextStyle(color: AppTheme.textSecondary),
@@ -604,7 +728,10 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
               Navigator.pop(ctx);
               ref.read(trackingControllerProvider.notifier).discardTracking();
             },
-            child: const Text('Discard', style: TextStyle(color: AppTheme.error)),
+            child: const Text(
+              'Discard',
+              style: TextStyle(color: AppTheme.error),
+            ),
           ),
         ],
       ),
@@ -612,115 +739,304 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   }
 
   Future<void> _handleStartTracking(BuildContext context) async {
-    final result =
-        await ref.read(trackingControllerProvider.notifier).startTracking();
+    final result = await ref
+        .read(trackingControllerProvider.notifier)
+        .startTracking();
     if (result == PermissionResult.granted) return;
-    if (!mounted) return;
+    if (!context.mounted) return;
 
-    final ctx = context;
-    final shouldRetry =
-        await PermissionUtils.handlePermissionResult(ctx, result);
-    if (shouldRetry && mounted) {
-      final retryResult =
-          await ref.read(trackingControllerProvider.notifier).startTracking();
-      if (retryResult != PermissionResult.granted && mounted) {
-        ScaffoldMessenger.of(ctx).showSnackBar(
+    final shouldRetry = await PermissionUtils.handlePermissionResult(
+      context,
+      result,
+    );
+    if (!context.mounted) return;
+    if (shouldRetry) {
+      final retryResult = await ref
+          .read(trackingControllerProvider.notifier)
+          .startTracking();
+      if (!context.mounted) return;
+      if (retryResult != PermissionResult.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Location permission is required to track your activity.'),
+            content: const Text(
+              'Location permission is required to track your activity.',
+            ),
             backgroundColor: AppTheme.error,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         );
       }
     }
   }
 
-  void _showActivitySavedSheet(BuildContext context, TrackingControllerState state) {
+  void _showActivitySavedSheet(
+    BuildContext context,
+    TrackingControllerState state,
+  ) {
     final activity = state.lastSavedActivity!;
+    final unlocked = state.newlyUnlockedAchievements;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.cardBackground,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceLight,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppTheme.success.withValues(alpha: 0.1),
-                ),
-                child: const Icon(Icons.check_rounded, color: AppTheme.success, size: 36),
-              ),
-              const SizedBox(height: 16),
-              Text('Activity Saved!',
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 24),
-              Row(children: [
-                Expanded(child: _SavedStat(label: 'Distance', value: activity.formattedDistance)),
-                Expanded(child: _SavedStat(label: 'Duration', value: activity.formattedDuration)),
-              ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(child: _SavedStat(label: 'Avg Pace', value: activity.formattedPace)),
-                Expanded(
-                    child: activity.elevationGainMeters != null
-                        ? _SavedStat(
-                            label: 'Elevation',
-                            value: '${activity.elevationGainMeters!.toStringAsFixed(0)}m')
-                        : const SizedBox()),
-              ]),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => ActivityDetailScreen(activity: activity)));
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.electricLime,
-                    foregroundColor: AppTheme.background,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      builder: (ctx) => _ActivitySavedSheet(
+        activity: activity,
+        newlyUnlocked: unlocked,
+        onShare: () async {
+          final reel = ref.read(highlightReelServiceProvider);
+          try {
+            await reel.share(activity);
+          } catch (e) {
+            if (!ctx.mounted) return;
+            ScaffoldMessenger.of(
+              ctx,
+            ).showSnackBar(SnackBar(content: Text('Share failed: $e')));
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _ActivitySavedSheet extends StatefulWidget {
+  const _ActivitySavedSheet({
+    required this.activity,
+    required this.newlyUnlocked,
+    required this.onShare,
+  });
+
+  final Activity activity;
+  final List<String> newlyUnlocked;
+  final Future<void> Function() onShare;
+
+  @override
+  State<_ActivitySavedSheet> createState() => _ActivitySavedSheetState();
+}
+
+class _ActivitySavedSheetState extends State<_ActivitySavedSheet> {
+  late final ConfettiController _confetti;
+
+  @override
+  void initState() {
+    super.initState();
+    _confetti = ConfettiController(duration: const Duration(seconds: 2));
+    if (widget.newlyUnlocked.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _confetti.play());
+    }
+  }
+
+  @override
+  void dispose() {
+    _confetti.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activity = widget.activity;
+    final unlocked = widget.newlyUnlocked;
+
+    return Stack(
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            color: AppTheme.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  child: const Text('View Details',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done',
-                    style: TextStyle(color: AppTheme.textSecondary, fontSize: 15)),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.success.withValues(alpha: 0.1),
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppTheme.success,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  unlocked.isEmpty
+                      ? 'Activity Saved!'
+                      : 'Activity Saved + ${unlocked.length} unlocked!',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (unlocked.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: unlocked
+                        .map(
+                          (code) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.electricLime.withValues(
+                                alpha: 0.18,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.electricLime.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              code.replaceAll('_', ' ').toUpperCase(),
+                              style: const TextStyle(
+                                color: AppTheme.electricLime,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Distance',
+                        value: activity.formattedDistance,
+                      ),
+                    ),
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Duration',
+                        value: activity.formattedDuration,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Avg Pace',
+                        value: activity.formattedPace,
+                      ),
+                    ),
+                    Expanded(
+                      child: activity.elevationGainMeters != null
+                          ? _SavedStat(
+                              label: 'Elevation',
+                              value:
+                                  '${activity.elevationGainMeters!.toStringAsFixed(0)}m',
+                            )
+                          : const SizedBox(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: widget.onShare,
+                        icon: const Icon(Icons.ios_share_rounded),
+                        label: const Text('Share'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.electricLime,
+                          side: const BorderSide(color: AppTheme.electricLime),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ActivityDetailScreen(activity: activity),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.electricLime,
+                          foregroundColor: AppTheme.background,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'View Details',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
+        ConfettiWidget(
+          confettiController: _confetti,
+          blastDirectionality: BlastDirectionality.explosive,
+          numberOfParticles: 24,
+          maxBlastForce: 18,
+          minBlastForce: 6,
+          gravity: 0.4,
+          colors: const [
+            Color(0xFFCCFF00),
+            Color(0xFFFFD166),
+            Color(0xFFB8A4FF),
+            Color(0xFF7AD3FF),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -755,7 +1071,9 @@ class _ActivityTypeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.electricLime.withValues(alpha: 0.15) : AppTheme.cardBackground,
+          color: isSelected
+              ? AppTheme.electricLime.withValues(alpha: 0.15)
+              : AppTheme.cardBackground,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: isSelected ? AppTheme.electricLime : AppTheme.surfaceLight,
@@ -765,16 +1083,24 @@ class _ActivityTypeChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 18,
-                color: isSelected ? AppTheme.electricLime : AppTheme.textSecondary),
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected
+                  ? AppTheme.electricLime
+                  : AppTheme.textSecondary,
+            ),
             const SizedBox(width: 6),
-            Text(label,
-                style: TextStyle(
-                  color: isSelected ? AppTheme.electricLime : AppTheme.textSecondary,
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                )),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? AppTheme.electricLime
+                    : AppTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
           ],
         ),
       ),
@@ -791,16 +1117,22 @@ class _GpsSignalIndicator extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.gps_fixed_rounded,
-            size: compact ? 14 : 16, color: AppTheme.success),
+        Icon(
+          Icons.gps_fixed_rounded,
+          size: compact ? 14 : 16,
+          color: AppTheme.success,
+        ),
         if (!compact) ...[
           const SizedBox(width: 4),
-          const Text('GPS',
-              style: TextStyle(
-                  color: AppTheme.success,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5)),
+          const Text(
+            'GPS',
+            style: TextStyle(
+              color: AppTheme.success,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
         ],
       ],
     );
@@ -827,7 +1159,11 @@ class _MetricRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: _MetricTile(info: left)),
-          Container(width: 1, height: 50, color: AppTheme.surfaceLight.withValues(alpha: 0.5)),
+          Container(
+            width: 1,
+            height: 50,
+            color: AppTheme.surfaceLight.withValues(alpha: 0.5),
+          ),
           Expanded(child: _MetricTile(info: right)),
         ],
       ),
@@ -849,26 +1185,36 @@ class _MetricTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Text(info.value,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: info.color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                )),
+            Text(
+              info.value,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: info.color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
             const SizedBox(width: 3),
-            Text(info.unit,
-                style: TextStyle(
-                    fontSize: 12, color: info.color.withValues(alpha: 0.6), fontWeight: FontWeight.w500)),
+            Text(
+              info.unit,
+              style: TextStyle(
+                fontSize: 12,
+                color: info.color.withValues(alpha: 0.6),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 2),
-        Text(info.label.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.textTertiary,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w500)),
+        Text(
+          info.label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppTheme.textTertiary,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -905,13 +1251,22 @@ class _ControlButton extends StatelessWidget {
               color: filled ? color : color.withValues(alpha: 0.12),
               border: filled ? null : Border.all(color: color, width: 2),
             ),
-            child: Icon(icon,
-                color: filled ? AppTheme.background : color, size: size * 0.45),
+            child: Icon(
+              icon,
+              color: filled ? AppTheme.background : color,
+              size: size * 0.45,
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(label,
-            style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -984,7 +1339,9 @@ class _FinishButtonState extends State<_FinishButton>
                   child: CircularProgressIndicator(
                     value: _holdController.value,
                     color: AppTheme.electricLime,
-                    backgroundColor: AppTheme.electricLime.withValues(alpha: 0.15),
+                    backgroundColor: AppTheme.electricLime.withValues(
+                      alpha: 0.15,
+                    ),
                     strokeWidth: 3,
                   ),
                 ),
@@ -998,17 +1355,25 @@ class _FinishButtonState extends State<_FinishButton>
                         : AppTheme.electricLime.withValues(alpha: 0.12),
                     border: Border.all(color: AppTheme.electricLime, width: 2),
                   ),
-                  child: const Icon(Icons.stop_rounded,
-                      color: AppTheme.electricLime, size: 22),
+                  child: const Icon(
+                    Icons.stop_rounded,
+                    color: AppTheme.electricLime,
+                    size: 22,
+                  ),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 6),
-        const Text('Hold to Finish',
-            style: TextStyle(
-                color: AppTheme.electricLime, fontSize: 10, fontWeight: FontWeight.w500)),
+        const Text(
+          'Hold to Finish',
+          style: TextStyle(
+            color: AppTheme.electricLime,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
@@ -1026,14 +1391,19 @@ class _LockedMetric extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(value,
-            style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary.withValues(alpha: 0.8))),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary.withValues(alpha: 0.8),
+          ),
+        ),
         const SizedBox(width: 4),
-        Text(unit,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textTertiary)),
+        Text(
+          unit,
+          style: const TextStyle(fontSize: 12, color: AppTheme.textTertiary),
+        ),
       ],
     );
   }
@@ -1055,13 +1425,22 @@ class _SavedStat extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppTheme.electricLime, fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppTheme.electricLime,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(
-                  color: AppTheme.textTertiary, fontSize: 11, fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppTheme.textTertiary,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

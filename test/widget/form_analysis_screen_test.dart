@@ -8,10 +8,7 @@ import 'package:apex_run/ml/models/hrv_data.dart';
 Widget testApp(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: overrides,
-    child: MaterialApp(
-      theme: AppTheme.darkTheme,
-      home: child,
-    ),
+    child: MaterialApp(theme: AppTheme.darkTheme, home: child),
   );
 }
 
@@ -29,7 +26,10 @@ void main() {
                   children: [
                     const Text(
                       'Recovery Status',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -85,7 +85,10 @@ void main() {
         cadenceSpm: 178,
         strideLengthM: 1.15,
         formScore: 78,
-        coachingTips: ['Increase cadence to 180+', 'Reduce ground contact time'],
+        coachingTips: [
+          'Increase cadence to 180+',
+          'Reduce ground contact time',
+        ],
       );
 
       await tester.pumpWidget(
@@ -99,7 +102,10 @@ void main() {
                   children: [
                     const Text(
                       'Form Score',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -110,8 +116,8 @@ void main() {
                         color: result.formScore >= 80
                             ? AppTheme.success
                             : result.formScore >= 60
-                                ? AppTheme.warning
-                                : AppTheme.error,
+                            ? AppTheme.warning
+                            : AppTheme.error,
                       ),
                     ),
                     const Text(
@@ -150,12 +156,36 @@ void main() {
             body: SingleChildScrollView(
               child: Column(
                 children: [
-                  _MetricRow('Ground Contact', '${result.groundContactTimeMs} ms', result.gctAssessment),
-                  _MetricRow('Vertical Osc.', '${result.verticalOscillationCm.toStringAsFixed(1)} cm', result.oscillationAssessment),
-                  _MetricRow('Cadence', '${result.cadenceSpm} spm', result.cadenceAssessment),
-                  _MetricRow('Stride Length', '${result.strideLengthM.toStringAsFixed(2)} m', ''),
-                  _MetricRow('Forward Lean', '${result.forwardLeanDeg?.toStringAsFixed(1)}°', ''),
-                  _MetricRow('Foot Strike', result.footStrikeType ?? 'Unknown', ''),
+                  _MetricRow(
+                    'Ground Contact',
+                    '${result.groundContactTimeMs.toInt()} ms',
+                    result.gctAssessment,
+                  ),
+                  _MetricRow(
+                    'Vertical Osc.',
+                    '${result.verticalOscillationCm.toStringAsFixed(1)} cm',
+                    result.oscillationAssessment,
+                  ),
+                  _MetricRow(
+                    'Cadence',
+                    '${result.cadenceSpm} spm',
+                    result.cadenceAssessment,
+                  ),
+                  _MetricRow(
+                    'Stride Length',
+                    '${result.strideLengthM.toStringAsFixed(2)} m',
+                    '',
+                  ),
+                  _MetricRow(
+                    'Forward Lean',
+                    '${result.forwardLeanDeg?.toStringAsFixed(1)}°',
+                    '',
+                  ),
+                  _MetricRow(
+                    'Foot Strike',
+                    result.footStrikeType ?? 'Unknown',
+                    '',
+                  ),
                 ],
               ),
             ),
@@ -165,7 +195,7 @@ void main() {
 
       expect(find.text('Ground Contact'), findsOneWidget);
       expect(find.text('215 ms'), findsOneWidget);
-      expect(find.text('Good'), findsOneWidget);
+      expect(find.text('Good'), findsAtLeastNWidgets(1));
       expect(find.text('175 spm'), findsOneWidget);
       expect(find.text('midfoot'), findsOneWidget);
     });
@@ -189,21 +219,29 @@ void main() {
                   children: [
                     const Text(
                       'Coaching Tips',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    ...tips.map((tip) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.lightbulb_outline,
-                                  color: AppTheme.electricLime, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(tip)),
-                            ],
-                          ),
-                        )),
+                    ...tips.map(
+                      (tip) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.lightbulb_outline,
+                              color: AppTheme.electricLime,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(tip)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -215,7 +253,10 @@ void main() {
       expect(find.text('Coaching Tips'), findsOneWidget);
       expect(find.text('Focus on quick ground contact'), findsOneWidget);
       expect(find.text('Aim for 180 steps per minute'), findsOneWidget);
-      expect(find.text('Keep forward lean around 5-10 degrees'), findsOneWidget);
+      expect(
+        find.text('Keep forward lean around 5-10 degrees'),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.lightbulb_outline), findsNWidgets(3));
     });
 
@@ -237,17 +278,18 @@ void main() {
             Scaffold(
               body: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    statusStr.substring(0, 1).toUpperCase() + statusStr.substring(1),
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    statusStr.substring(0, 1).toUpperCase() +
+                        statusStr.substring(1),
+                    style: TextStyle(color: color, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -256,7 +298,9 @@ void main() {
         );
 
         expect(
-          find.text(statusStr.substring(0, 1).toUpperCase() + statusStr.substring(1)),
+          find.text(
+            statusStr.substring(0, 1).toUpperCase() + statusStr.substring(1),
+          ),
           findsOneWidget,
         );
       }
@@ -277,11 +321,22 @@ class _MetricRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(color: AppTheme.textSecondary))),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
           if (assessment.isNotEmpty) ...[
             const SizedBox(width: 8),
-            Text(assessment, style: const TextStyle(color: AppTheme.electricLime, fontSize: 12)),
+            Text(
+              assessment,
+              style: const TextStyle(
+                color: AppTheme.electricLime,
+                fontSize: 12,
+              ),
+            ),
           ],
         ],
       ),

@@ -1,0 +1,95 @@
+{
+  "@@locale": "de",
+
+  "appName": "ApexRun",
+  "tagline": "PEAK PERFORMANCE",
+
+  "navHome": "Start",
+  "navFeed": "Feed",
+  "navRecord": "Aufnehmen",
+  "navChallenges": "Challenges",
+  "navProfile": "Profil",
+  "navCoach": "Coach",
+
+  "greetingWelcome": "Willkommen zurück",
+  "greetingSub": "Bereit für den nächsten Lauf?",
+
+  "todaysSteps": "Heutige Schritte",
+  "weeklySummary": "Wochenübersicht",
+  "recentActivities": "Letzte Aktivitäten",
+  "upcomingWorkouts": "Kommende Workouts",
+  "quickActions": "Schnellaktionen",
+  "noActivitiesYet": "Noch keine Aktivitäten. Starte deinen ersten Lauf!",
+
+  "recoveryHeading": "Erholung",
+  "recoveryBandPrimed": "Bereit",
+  "recoveryBandReady": "Fit",
+  "recoveryBandOk": "OK",
+  "recoveryBandTired": "Müde",
+  "recoveryBandRecover": "Erholen",
+
+  "signIn": "Anmelden",
+  "signUp": "Registrieren",
+  "signOut": "Abmelden",
+  "continueWithGoogle": "Mit Google fortfahren",
+  "continueWithApple": "Mit Apple fortfahren",
+  "emailHint": "E-Mail",
+  "passwordHint": "Passwort",
+  "forgotPassword": "Passwort vergessen?",
+  "resetPasswordTitle": "Passwort zurücksetzen",
+  "resetPasswordBody": "Gib deine E-Mail ein — wir senden dir einen Link.",
+  "sendLink": "Link senden",
+  "cancel": "Abbrechen",
+
+  "tierFree": "Free",
+  "tierPro": "Apex Pro",
+  "tierProPlus": "Apex Pro+",
+  "upgrade": "Upgrade",
+  "manage": "Verwalten",
+
+  "referralHeading": "Freunde einladen",
+  "referralBody": "Teile deinen Code. Beide erhalten 30 Tage Apex Pro bei Anmeldung.",
+  "referralRedeem": "Code einlösen",
+
+  "achievementsHeading": "Erfolge",
+  "achievementsEmpty": "Noch keine Erfolge — beende deinen ersten Lauf zum Freischalten.",
+
+  "recordStart": "Start",
+  "recordPause": "Pause",
+  "recordResume": "Weiter",
+  "recordFinish": "Beenden",
+
+  "activitySavedTitle": "Aktivität gespeichert!",
+  "activitySavedWithUnlocks": "Gespeichert + {n} freigeschaltet!",
+  "@activitySavedWithUnlocks": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "metricDistance": "Distanz",
+  "metricDuration": "Dauer",
+  "metricTime": "Zeit",
+  "metricPace": "Ø Pace",
+  "metricElevation": "Höhenmeter",
+  "metricHeartRate": "Herzfrequenz",
+
+  "challengesTitle": "Challenges",
+  "challengesEmpty": "Keine aktiven Challenges. Komm nach dem Wochen-Reset zurück.",
+  "challengeCompleted": "Abgeschlossen",
+  "challengeTimeRemaining": "{n}T übrig",
+  "@challengeTimeRemaining": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "feedTitle": "Freunde",
+  "feedEmpty": "Noch keine Aktivität von Freunden. Tippe oben rechts, um Läufer zu finden.",
+  "findFriends": "Freunde finden",
+
+  "deleteAccount": "Konto löschen",
+  "deleteAccountConfirmTitle": "Konto löschen?",
+  "deleteAccountConfirmBody": "Dies löscht deine Läufe, Segmente, Freunde und dein Profil dauerhaft. Daten werden in 30 Tagen gelöscht und können nicht wiederhergestellt werden.",
+  "deleteAccountConfirmAction": "Endgültig löschen"
+}

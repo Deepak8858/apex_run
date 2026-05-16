@@ -1,0 +1,80 @@
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: apexrun
+  _BACKEND_SERVICE: apexrun-api
+  _ML_SERVICE: apexrun-ml
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: build-backend
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$SHORT_SHA
+      - backend
+
+  - id: build-ml-service
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/ml-service:$SHORT_SHA
+      - ml-service
+
+  - id: push-backend
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$SHORT_SHA
+
+  - id: push-ml-service
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/ml-service:$SHORT_SHA
+
+  - id: deploy-backend
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_BACKEND_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --service-account=apexrun-runtime@$PROJECT_ID.iam.gserviceaccount.com
+      - --port=8080
+      - --cpu=1
+      - --memory=512Mi
+      - --min-instances=0
+      - --max-instances=20
+      - --set-env-vars=^|^GIN_MODE=release|LOG_FORMAT=json|LOG_LEVEL=info|ALLOWED_ORIGINS=https://apexrun.app,https://www.apexrun.app
+      - --set-secrets=DATABASE_URL=apexrun-database-url:latest,SUPABASE_URL=apexrun-supabase-url:latest,SUPABASE_ANON_KEY=apexrun-supabase-anon-key:latest,SUPABASE_JWT_SECRET=apexrun-supabase-jwt-secret:latest,REDIS_URL=apexrun-redis-url:latest,REDIS_PASSWORD=apexrun-redis-password:latest
+
+  - id: deploy-ml-service
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_ML_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/ml-service:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --service-account=apexrun-runtime@$PROJECT_ID.iam.gserviceaccount.com
+      - --port=8001
+      - --cpu=1
+      - --memory=1Gi
+      - --min-instances=0
+      - --max-instances=10
+      - --set-env-vars=^|^APP_VERSION=$SHORT_SHA|CORS_ALLOW_ORIGINS=https://apexrun.app,https://www.apexrun.app
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/ml-service:$SHORT_SHA

@@ -25,6 +25,10 @@ class UserProfile with _$UserProfile {
     @Default(200) int privacyRadiusMeters,
     @Default('km') String preferredDistanceUnit,
     @Default('min_per_km') String preferredPaceFormat,
+    @Default(0) int streakDays,
+    @Default(0) int streakLongest,
+    @Default(0) int streakFreezeAvailable,
+    DateTime? lastActivityDate,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) = _UserProfile;
@@ -53,6 +57,12 @@ class UserProfile with _$UserProfile {
           (json['preferred_distance_unit'] as String?) ?? 'km',
       preferredPaceFormat:
           (json['preferred_pace_format'] as String?) ?? 'min_per_km',
+      streakDays: (json['streak_days'] as int?) ?? 0,
+      streakLongest: (json['streak_longest'] as int?) ?? 0,
+      streakFreezeAvailable: (json['streak_freeze_available'] as int?) ?? 0,
+      lastActivityDate: json['last_activity_date'] != null
+          ? DateTime.parse(json['last_activity_date'] as String)
+          : null,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,

@@ -1,8 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/logger/app_logger.dart';
 import '../../data/datasources/auth_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
+import '../../data/services/revenue_cat_service.dart';
 import '../../domain/repositories/auth_repository.dart';
+
+final _log = AppLogger.tag('AuthState');
 
 /// Provider for Supabase client
 final supabaseClientProvider = Provider<SupabaseClient>((ref) {
@@ -61,10 +65,15 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
 
     // Listen to auth state changes
     _repository.authStateChanges.listen((authState) {
-      if (authState.session != null) {
+      final session = authState.session;
+      if (session != null) {
         state = AuthStatus.authenticated;
+        // Bind RevenueCat to Supabase user id so the webhook can find the
+        // right `subscriptions` row.
+        RevenueCatService.identify(session.user.id);
       } else {
         state = AuthStatus.unauthenticated;
+        RevenueCatService.resetOnSignOut();
       }
     });
   }
@@ -76,13 +85,13 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
     required String password,
   }) async {
     try {
-      print('🔵 AuthStateNotifier: Starting email sign-in');
+      _log.i('Email sign-in started');
       state = AuthStatus.loading;
       await _repository.signInWithEmail(email: email, password: password);
       state = AuthStatus.authenticated;
-      print('🟢 AuthStateNotifier: Sign-in successful, state: authenticated');
-    } catch (e) {
-      print('🔴 AuthStateNotifier: Sign-in error: $e');
+      _log.i('Email sign-in authenticated');
+    } catch (e, st) {
+      _log.e('Email sign-in error', error: e, stackTrace: st);
       state = AuthStatus.unauthenticated;
       rethrow;
     }
@@ -94,7 +103,7 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
     String? displayName,
   }) async {
     try {
-      print('🔵 AuthStateNotifier: Starting email sign-up');
+      _log.i('Email sign-up started');
       state = AuthStatus.loading;
       await _repository.signUpWithEmail(
         email: email,
@@ -102,9 +111,9 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
         displayName: displayName,
       );
       state = AuthStatus.authenticated;
-      print('🟢 AuthStateNotifier: Sign-up successful, state: authenticated');
-    } catch (e) {
-      print('🔴 AuthStateNotifier: Sign-up error: $e');
+      _log.i('Email sign-up authenticated');
+    } catch (e, st) {
+      _log.e('Email sign-up error', error: e, stackTrace: st);
       state = AuthStatus.unauthenticated;
       rethrow;
     }
@@ -144,5 +153,18 @@ class AuthStateNotifier extends StateNotifier<AuthStatus> {
 
   Future<void> resetPassword({required String email}) async {
     await _repository.resetPassword(email: email);
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      _log.w('Account deletion requested by user');
+      state = AuthStatus.loading;
+      await _repository.deleteAccount();
+      state = AuthStatus.unauthenticated;
+      _log.w('Account deletion completed');
+    } catch (e, st) {
+      _log.e('Account deletion error', error: e, stackTrace: st);
+      rethrow;
+    }
   }
 }

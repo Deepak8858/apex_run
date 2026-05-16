@@ -17,6 +17,22 @@ class WorkoutDataSource {
     return PlannedWorkout.fromSupabaseJson(response);
   }
 
+  /// Create several planned workouts in one request.
+  Future<List<PlannedWorkout>> createWorkouts(
+    List<PlannedWorkout> workouts,
+  ) async {
+    if (workouts.isEmpty) return const [];
+
+    final response = await _supabase
+        .from('planned_workouts')
+        .insert(workouts.map((w) => w.toSupabaseJson()).toList())
+        .select();
+
+    return (response as List)
+        .map((json) => PlannedWorkout.fromSupabaseJson(json))
+        .toList();
+  }
+
   /// Get upcoming workouts (not completed, future dates)
   Future<List<PlannedWorkout>> getUpcomingWorkouts(String userId) async {
     final today = DateTime.now().toIso8601String().split('T').first;
@@ -67,19 +83,15 @@ class WorkoutDataSource {
   }
 
   /// Mark workout as completed
-  Future<void> markCompleted(
-      String workoutId, String activityId) async {
-    await _supabase.from('planned_workouts').update({
-      'is_completed': true,
-      'completed_activity_id': activityId,
-    }).eq('id', workoutId);
+  Future<void> markCompleted(String workoutId, String activityId) async {
+    await _supabase
+        .from('planned_workouts')
+        .update({'is_completed': true, 'completed_activity_id': activityId})
+        .eq('id', workoutId);
   }
 
   /// Delete a workout
   Future<void> deleteWorkout(String workoutId) async {
-    await _supabase
-        .from('planned_workouts')
-        .delete()
-        .eq('id', workoutId);
+    await _supabase.from('planned_workouts').delete().eq('id', workoutId);
   }
 }

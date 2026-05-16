@@ -1,0 +1,95 @@
+{
+  "@@locale": "fr",
+
+  "appName": "ApexRun",
+  "tagline": "PERFORMANCE MAXIMALE",
+
+  "navHome": "Accueil",
+  "navFeed": "Fil",
+  "navRecord": "Enregistrer",
+  "navChallenges": "Défis",
+  "navProfile": "Profil",
+  "navCoach": "Coach",
+
+  "greetingWelcome": "Bon retour",
+  "greetingSub": "Prêt pour ta prochaine course ?",
+
+  "todaysSteps": "Pas du jour",
+  "weeklySummary": "Résumé hebdomadaire",
+  "recentActivities": "Activités récentes",
+  "upcomingWorkouts": "Séances à venir",
+  "quickActions": "Actions rapides",
+  "noActivitiesYet": "Pas encore d'activité. Lance ta première course !",
+
+  "recoveryHeading": "Récupération",
+  "recoveryBandPrimed": "Au top",
+  "recoveryBandReady": "Prêt",
+  "recoveryBandOk": "OK",
+  "recoveryBandTired": "Fatigué",
+  "recoveryBandRecover": "Repos",
+
+  "signIn": "Se connecter",
+  "signUp": "S'inscrire",
+  "signOut": "Se déconnecter",
+  "continueWithGoogle": "Continuer avec Google",
+  "continueWithApple": "Continuer avec Apple",
+  "emailHint": "E-mail",
+  "passwordHint": "Mot de passe",
+  "forgotPassword": "Mot de passe oublié ?",
+  "resetPasswordTitle": "Réinitialiser le mot de passe",
+  "resetPasswordBody": "Saisis ton e-mail — nous t'envoyons un lien.",
+  "sendLink": "Envoyer",
+  "cancel": "Annuler",
+
+  "tierFree": "Gratuit",
+  "tierPro": "Apex Pro",
+  "tierProPlus": "Apex Pro+",
+  "upgrade": "Passer à Pro",
+  "manage": "Gérer",
+
+  "referralHeading": "Inviter un ami",
+  "referralBody": "Partage ton code. Vous obtenez tous les deux 30 jours d'Apex Pro.",
+  "referralRedeem": "Saisir un code",
+
+  "achievementsHeading": "Succès",
+  "achievementsEmpty": "Aucun succès — termine ta première course pour en débloquer.",
+
+  "recordStart": "Démarrer",
+  "recordPause": "Pause",
+  "recordResume": "Reprendre",
+  "recordFinish": "Terminer",
+
+  "activitySavedTitle": "Activité enregistrée !",
+  "activitySavedWithUnlocks": "Enregistrée + {n} débloqué !",
+  "@activitySavedWithUnlocks": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "metricDistance": "Distance",
+  "metricDuration": "Durée",
+  "metricTime": "Temps",
+  "metricPace": "Allure moy",
+  "metricElevation": "Dénivelé",
+  "metricHeartRate": "Fréquence",
+
+  "challengesTitle": "Défis",
+  "challengesEmpty": "Aucun défi actif. Reviens après la prochaine réinitialisation hebdo.",
+  "challengeCompleted": "Terminé",
+  "challengeTimeRemaining": "{n}j restant(s)",
+  "@challengeTimeRemaining": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "feedTitle": "Amis",
+  "feedEmpty": "Pas encore d'activité d'amis. Touche l'icône pour trouver des coureurs.",
+  "findFriends": "Trouver des amis",
+
+  "deleteAccount": "Supprimer le compte",
+  "deleteAccountConfirmTitle": "Supprimer le compte ?",
+  "deleteAccountConfirmBody": "Cela supprime tes courses, segments, amis et profil. Les données sont effacées sous 30 jours et ne peuvent être récupérées.",
+  "deleteAccountConfirmAction": "Supprimer définitivement"
+}

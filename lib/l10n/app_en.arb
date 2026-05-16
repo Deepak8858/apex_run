@@ -1,0 +1,108 @@
+{
+  "@@locale": "en",
+
+  "appName": "ApexRun",
+  "tagline": "PEAK PERFORMANCE",
+
+  "navHome": "Home",
+  "navFeed": "Feed",
+  "navRecord": "Record",
+  "navChallenges": "Challenges",
+  "navProfile": "Profile",
+  "navCoach": "Coach",
+
+  "greetingWelcome": "Welcome Back",
+  "greetingSub": "Ready to crush your next run?",
+
+  "todaysSteps": "Today's Steps",
+  "weeklySummary": "Weekly Summary",
+  "recentActivities": "Recent Activities",
+  "upcomingWorkouts": "Upcoming Workouts",
+  "quickActions": "Quick Actions",
+  "noActivitiesYet": "No activities yet. Start your first run!",
+
+  "recoveryHeading": "Recovery",
+  "recoveryBandPrimed": "Primed",
+  "recoveryBandReady": "Ready",
+  "recoveryBandOk": "OK",
+  "recoveryBandTired": "Tired",
+  "recoveryBandRecover": "Recover",
+
+  "signIn": "Sign in",
+  "signUp": "Sign up",
+  "signOut": "Sign Out",
+  "continueWithGoogle": "Continue with Google",
+  "continueWithApple": "Continue with Apple",
+  "emailHint": "Email",
+  "passwordHint": "Password",
+  "forgotPassword": "Forgot password?",
+  "resetPasswordTitle": "Reset password",
+  "resetPasswordBody": "Enter your account email — we'll send a reset link.",
+  "sendLink": "Send link",
+  "cancel": "Cancel",
+
+  "permGrant": "Allow",
+  "permLocationTitle": "Location",
+  "permLocationBody": "Required to track your runs accurately.",
+  "permCameraTitle": "Camera",
+  "permCameraBody": "Optional — for on-device running-form analysis.",
+  "permNotificationsTitle": "Notifications",
+  "permNotificationsBody": "Optional — streak reminders, achievements, weekly summaries.",
+  "permActivityTitle": "Activity",
+  "permActivityBody": "Optional — step counter and motion-based metrics.",
+
+  "tierFree": "Free",
+  "tierPro": "Apex Pro",
+  "tierProPlus": "Apex Pro+",
+  "upgrade": "Upgrade",
+  "manage": "Manage",
+  "subscribeAutoRenewNote": "Subscription auto-renews until cancelled. Cancel any time in App Store / Play Store.",
+
+  "referralHeading": "Refer a friend",
+  "referralBody": "Share your code. Both get 30 days of Apex Pro when they sign up.",
+  "referralRedeem": "Have a code? Redeem",
+
+  "achievementsHeading": "Achievements",
+  "achievementsEmpty": "No achievements yet — finish your first run to unlock.",
+
+  "recordStart": "Start",
+  "recordPause": "Pause",
+  "recordResume": "Resume",
+  "recordFinish": "Finish",
+  "recordLock": "Lock",
+  "recordUnlock": "Unlock",
+
+  "activitySavedTitle": "Activity Saved!",
+  "activitySavedWithUnlocks": "Activity Saved + {n} unlocked!",
+  "@activitySavedWithUnlocks": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "metricDistance": "Distance",
+  "metricDuration": "Duration",
+  "metricTime": "Time",
+  "metricPace": "Avg Pace",
+  "metricElevation": "Elevation",
+  "metricHeartRate": "Heart Rate",
+
+  "challengesTitle": "Challenges",
+  "challengesEmpty": "No active challenges. Check back after the next weekly reset.",
+  "challengeCompleted": "Completed",
+  "challengeTimeRemaining": "{n}d left",
+  "@challengeTimeRemaining": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "feedTitle": "Friends",
+  "feedEmpty": "No friend activity yet. Tap the icon top-right to find runners.",
+  "findFriends": "Find friends",
+
+  "deleteAccount": "Delete Account",
+  "deleteAccountConfirmTitle": "Delete account?",
+  "deleteAccountConfirmBody": "This permanently deletes your runs, segments, friends, and profile. Your data will be purged within 30 days and cannot be recovered. This action is final.",
+  "deleteAccountConfirmAction": "Delete forever"
+}

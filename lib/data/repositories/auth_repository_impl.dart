@@ -142,4 +142,15 @@ class AuthRepositoryImpl implements AuthRepository {
       throw Exception('Password update failed: $e');
     }
   }
+
+  @override
+  Future<void> deleteAccount() async {
+    try {
+      await _dataSource.deleteAccount();
+    } on AuthException catch (e) {
+      throw Exception('Account deletion auth error: ${e.message}');
+    } catch (e) {
+      throw Exception('Account deletion failed: $e');
+    }
+  }
 }

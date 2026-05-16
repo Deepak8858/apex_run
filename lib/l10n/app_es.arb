@@ -1,0 +1,95 @@
+{
+  "@@locale": "es",
+
+  "appName": "ApexRun",
+  "tagline": "RENDIMIENTO MÁXIMO",
+
+  "navHome": "Inicio",
+  "navFeed": "Comunidad",
+  "navRecord": "Grabar",
+  "navChallenges": "Retos",
+  "navProfile": "Perfil",
+  "navCoach": "Coach",
+
+  "greetingWelcome": "Bienvenido de nuevo",
+  "greetingSub": "¿Listo para tu próxima carrera?",
+
+  "todaysSteps": "Pasos de hoy",
+  "weeklySummary": "Resumen semanal",
+  "recentActivities": "Actividades recientes",
+  "upcomingWorkouts": "Entrenamientos próximos",
+  "quickActions": "Acciones rápidas",
+  "noActivitiesYet": "Aún sin actividades. ¡Empieza tu primera carrera!",
+
+  "recoveryHeading": "Recuperación",
+  "recoveryBandPrimed": "Listo",
+  "recoveryBandReady": "Preparado",
+  "recoveryBandOk": "OK",
+  "recoveryBandTired": "Cansado",
+  "recoveryBandRecover": "Descansa",
+
+  "signIn": "Iniciar sesión",
+  "signUp": "Crear cuenta",
+  "signOut": "Cerrar sesión",
+  "continueWithGoogle": "Continuar con Google",
+  "continueWithApple": "Continuar con Apple",
+  "emailHint": "Correo",
+  "passwordHint": "Contraseña",
+  "forgotPassword": "¿Olvidaste tu contraseña?",
+  "resetPasswordTitle": "Restablecer contraseña",
+  "resetPasswordBody": "Introduce tu correo y te enviaremos un enlace.",
+  "sendLink": "Enviar enlace",
+  "cancel": "Cancelar",
+
+  "tierFree": "Gratis",
+  "tierPro": "Apex Pro",
+  "tierProPlus": "Apex Pro+",
+  "upgrade": "Actualizar",
+  "manage": "Gestionar",
+
+  "referralHeading": "Invita a un amigo",
+  "referralBody": "Comparte tu código. Ambos obtenéis 30 días de Apex Pro al registrarse.",
+  "referralRedeem": "¿Tienes un código? Canjea",
+
+  "achievementsHeading": "Logros",
+  "achievementsEmpty": "Sin logros aún — completa tu primera carrera para desbloquear.",
+
+  "recordStart": "Iniciar",
+  "recordPause": "Pausar",
+  "recordResume": "Reanudar",
+  "recordFinish": "Terminar",
+
+  "activitySavedTitle": "¡Actividad guardada!",
+  "activitySavedWithUnlocks": "¡Actividad guardada + {n} desbloqueados!",
+  "@activitySavedWithUnlocks": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "metricDistance": "Distancia",
+  "metricDuration": "Duración",
+  "metricTime": "Tiempo",
+  "metricPace": "Ritmo medio",
+  "metricElevation": "Desnivel",
+  "metricHeartRate": "Pulso",
+
+  "challengesTitle": "Retos",
+  "challengesEmpty": "Sin retos activos. Vuelve tras el próximo reinicio semanal.",
+  "challengeCompleted": "Completado",
+  "challengeTimeRemaining": "{n}d restantes",
+  "@challengeTimeRemaining": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+
+  "feedTitle": "Amigos",
+  "feedEmpty": "Aún sin actividad de amigos. Toca el icono para buscar corredores.",
+  "findFriends": "Buscar amigos",
+
+  "deleteAccount": "Eliminar cuenta",
+  "deleteAccountConfirmTitle": "¿Eliminar cuenta?",
+  "deleteAccountConfirmBody": "Esto borra permanentemente tus carreras, segmentos, amigos y perfil. Tus datos se eliminarán en 30 días y no podrán recuperarse.",
+  "deleteAccountConfirmAction": "Eliminar para siempre"
+}

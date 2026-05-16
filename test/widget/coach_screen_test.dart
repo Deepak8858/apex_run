@@ -8,10 +8,7 @@ import 'package:apex_run/domain/models/planned_workout.dart';
 Widget testApp(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
     overrides: overrides,
-    child: MaterialApp(
-      theme: AppTheme.darkTheme,
-      home: child,
-    ),
+    child: MaterialApp(theme: AppTheme.darkTheme, home: child),
   );
 }
 
@@ -22,9 +19,7 @@ void main() {
         testApp(
           Scaffold(
             appBar: AppBar(title: const Text('AI Coach')),
-            body: const Center(
-              child: Text('Coach Screen'),
-            ),
+            body: const Center(child: Text('Coach Screen')),
           ),
         ),
       );
@@ -73,9 +68,7 @@ void main() {
                       ],
                       if (workout.targetDurationMinutes != null) ...[
                         const SizedBox(height: 4),
-                        Text(
-                          'Duration: ${workout.targetDurationMinutes} min',
-                        ),
+                        Text('Duration: ${workout.targetDurationMinutes} min'),
                       ],
                     ],
                   ),
@@ -100,9 +93,11 @@ void main() {
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
+                color: AppTheme.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppTheme.error.withValues(alpha: 0.3),
+                ),
               ),
               child: const Row(
                 children: [
@@ -121,7 +116,10 @@ void main() {
         ),
       );
 
-      expect(find.text('Something went wrong. Try again later.'), findsOneWidget);
+      expect(
+        find.text('Something went wrong. Try again later.'),
+        findsOneWidget,
+      );
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
@@ -166,7 +164,11 @@ void main() {
                       color: AppTheme.success,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check, size: 16, color: Colors.white),
+                    child: const Icon(
+                      Icons.check,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   const Text('Easy Run - Completed'),

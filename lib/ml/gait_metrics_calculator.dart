@@ -91,7 +91,10 @@ class GaitMetricsCalculator {
   /// Improved ground contact detection using velocity reversal
   /// with smoothing from 3 consecutive frames
   void _detectGroundContact(
-      _PoseFrame prevPrev, _PoseFrame prev, _PoseFrame curr) {
+    _PoseFrame prevPrev,
+    _PoseFrame prev,
+    _PoseFrame curr,
+  ) {
     // Left foot: track ankle + heel Y positions
     final leftAnkleY = curr.landmarks[leftAnkle].y;
     final prevLeftAnkleY = prev.landmarks[leftAnkle].y;
@@ -147,9 +150,8 @@ class GaitMetricsCalculator {
 
   /// Track vertical center-of-mass oscillation via hip midpoint
   void _trackVerticalOscillation(_PoseFrame frame) {
-    final hipMidY = (frame.landmarks[leftHip].y +
-            frame.landmarks[rightHip].y) /
-        2;
+    final hipMidY =
+        (frame.landmarks[leftHip].y + frame.landmarks[rightHip].y) / 2;
     _hipYHistory.add(hipMidY);
     _verticalOscillations.add(hipMidY);
 
@@ -176,11 +178,11 @@ class GaitMetricsCalculator {
     if (intervals.isEmpty) return 0;
 
     // Remove outliers (> 2 SD from mean)
-    final avgInterval =
-        intervals.reduce((a, b) => a + b) / intervals.length;
+    final avgInterval = intervals.reduce((a, b) => a + b) / intervals.length;
     final sd = _standardDeviation(intervals.map((e) => e.toDouble()).toList());
-    final filtered = intervals.where(
-        (i) => (i - avgInterval).abs() < 2 * sd).toList();
+    final filtered = intervals
+        .where((i) => (i - avgInterval).abs() < 2 * sd)
+        .toList();
 
     if (filtered.isEmpty) return avgInterval * 0.6;
 
@@ -248,13 +250,11 @@ class GaitMetricsCalculator {
 
     // Use only recent timestamps (last 3 seconds worth)
     final cutoff = _stepTimestamps.last - 3000;
-    final recentSteps =
-        _stepTimestamps.where((t) => t >= cutoff).toList();
+    final recentSteps = _stepTimestamps.where((t) => t >= cutoff).toList();
 
     if (recentSteps.length < 3) {
       // Fallback to full range
-      final timeSpanMs =
-          _stepTimestamps.last - _stepTimestamps.first;
+      final timeSpanMs = _stepTimestamps.last - _stepTimestamps.first;
       if (timeSpanMs <= 0) return 0;
       return ((_stepTimestamps.length / timeSpanMs) * 60000).round();
     }
@@ -307,8 +307,8 @@ class GaitMetricsCalculator {
       final frame = _frames[i];
       final leftHipY = frame.landmarks[leftHip].y;
       final rightHipY = frame.landmarks[rightHip].y;
-      final hipDist =
-          (frame.landmarks[leftHip].x - frame.landmarks[rightHip].x).abs();
+      final hipDist = (frame.landmarks[leftHip].x - frame.landmarks[rightHip].x)
+          .abs();
 
       if (hipDist < 0.01) continue;
 
@@ -337,7 +337,7 @@ class GaitMetricsCalculator {
       // Check both feet
       for (final side in [
         [leftHeel, leftFootIndex],
-        [rightHeel, rightFootIndex]
+        [rightHeel, rightFootIndex],
       ]) {
         final heelY = frame.landmarks[side[0]].y;
         final toeY = frame.landmarks[side[1]].y;
@@ -373,7 +373,9 @@ class GaitMetricsCalculator {
     if (_frames.length < 30) return 1.0;
 
     final recent = _frames.sublist(
-        math.max(0, _frames.length - 45), _frames.length);
+      math.max(0, _frames.length - 45),
+      _frames.length,
+    );
 
     // Calculate range of motion for each wrist
     double leftMinX = 1.0, leftMaxX = 0.0;
@@ -398,15 +400,16 @@ class GaitMetricsCalculator {
 
     // Calculate arc length (combined X + Y range) for each arm
     final leftArc = math.sqrt(
-        math.pow(leftMaxX - leftMinX, 2) + math.pow(leftMaxY - leftMinY, 2));
-    final rightArc = math.sqrt(math.pow(rightMaxX - rightMinX, 2) +
-        math.pow(rightMaxY - rightMinY, 2));
+      math.pow(leftMaxX - leftMinX, 2) + math.pow(leftMaxY - leftMinY, 2),
+    );
+    final rightArc = math.sqrt(
+      math.pow(rightMaxX - rightMinX, 2) + math.pow(rightMaxY - rightMinY, 2),
+    );
 
     if (leftArc == 0 && rightArc == 0) return 1.0;
     if (leftArc == 0 || rightArc == 0) return 0.5;
 
-    final ratio = math.min(leftArc, rightArc) /
-        math.max(leftArc, rightArc);
+    final ratio = math.min(leftArc, rightArc) / math.max(leftArc, rightArc);
     return ratio.clamp(0.0, 1.0);
   }
 
@@ -418,39 +421,58 @@ class GaitMetricsCalculator {
     if (gct > 0) {
       if (gct < 200) {
         score += 18;
-      } else if (gct < 230) score += 14;
-      else if (gct < 260) score += 10;
-      else if (gct < 300) score += 5;
-      else score += 2;
+      } else if (gct < 230) {
+        score += 14;
+      } else if (gct < 260) {
+        score += 10;
+      } else if (gct < 300) {
+        score += 5;
+      } else {
+        score += 2;
+      }
     }
 
     final cadence = calculateCadence();
     if (cadence > 0) {
       if (cadence >= 175 && cadence <= 190) {
         score += 18;
-      } else if (cadence >= 170) score += 14;
-      else if (cadence >= 165) score += 10;
-      else if (cadence >= 160) score += 5;
-      else score += 2;
+      } else if (cadence >= 170) {
+        score += 14;
+      } else if (cadence >= 165) {
+        score += 10;
+      } else if (cadence >= 160) {
+        score += 5;
+      } else {
+        score += 2;
+      }
     }
 
     final lean = calculateForwardLeanDegrees();
     if (lean >= 5 && lean <= 10) {
       score += 8;
-    } else if (lean >= 3 && lean <= 15) score += 5;
-    else if (lean > 0) score += 2;
+    } else if (lean >= 3 && lean <= 15) {
+      score += 5;
+    } else if (lean > 0) {
+      score += 2;
+    }
 
     final hipDrop = calculateHipDropDegrees();
     if (hipDrop < 4) {
       score += 8;
-    } else if (hipDrop < 6) score += 5;
-    else if (hipDrop < 8) score += 3;
+    } else if (hipDrop < 6) {
+      score += 5;
+    } else if (hipDrop < 8) {
+      score += 3;
+    }
 
     final armSym = calculateArmSwingSymmetry();
     if (armSym >= 0.9) {
       score += 8;
-    } else if (armSym >= 0.8) score += 5;
-    else if (armSym >= 0.7) score += 3;
+    } else if (armSym >= 0.8) {
+      score += 5;
+    } else if (armSym >= 0.7) {
+      score += 3;
+    }
 
     return score.clamp(0, 100);
   }
@@ -462,52 +484,65 @@ class GaitMetricsCalculator {
     final gct = calculateGroundContactTimeMs();
     if (gct > 280) {
       tips.add(
-          'Reduce ground contact time (${gct.toInt()}ms). Focus on "quick feet" with light, springy steps.');
+        'Reduce ground contact time (${gct.toInt()}ms). Focus on "quick feet" with light, springy steps.',
+      );
     } else if (gct > 250) {
       tips.add(
-          'Ground contact (${gct.toInt()}ms) is average. Drills like high knees and bounds can help.');
+        'Ground contact (${gct.toInt()}ms) is average. Drills like high knees and bounds can help.',
+      );
     }
 
     final cadence = calculateCadence();
     if (cadence > 0 && cadence < 165) {
       tips.add(
-          'Cadence is low ($cadence spm). Use a 170-180 BPM metronome during easy runs to build habit.');
+        'Cadence is low ($cadence spm). Use a 170-180 BPM metronome during easy runs to build habit.',
+      );
     } else if (cadence > 0 && cadence < 175) {
       tips.add(
-          'Cadence ($cadence spm) could improve. Target 175-185 spm for optimal efficiency.');
+        'Cadence ($cadence spm) could improve. Target 175-185 spm for optimal efficiency.',
+      );
     }
 
     final lean = calculateForwardLeanDegrees();
     if (lean < 3) {
-      tips.add('Lean slightly forward from the ankles (not waist) for better propulsion.');
+      tips.add(
+        'Lean slightly forward from the ankles (not waist) for better propulsion.',
+      );
     } else if (lean > 15) {
       tips.add(
-          'Forward lean (${lean.toStringAsFixed(1)}°) is excessive. Stand taller and hinge from ankles.');
+        'Forward lean (${lean.toStringAsFixed(1)}°) is excessive. Stand taller and hinge from ankles.',
+      );
     }
 
     final hipDrop = calculateHipDropDegrees();
     if (hipDrop > 8) {
       tips.add(
-          'Significant hip drop (${hipDrop.toStringAsFixed(1)}°). Strengthen glutes with clamshells and single-leg squats.');
+        'Significant hip drop (${hipDrop.toStringAsFixed(1)}°). Strengthen glutes with clamshells and single-leg squats.',
+      );
     } else if (hipDrop > 5) {
       tips.add(
-          'Moderate hip drop. Include lateral band walks in your warm-up routine.');
+        'Moderate hip drop. Include lateral band walks in your warm-up routine.',
+      );
     }
 
     final armSym = calculateArmSwingSymmetry();
     if (armSym < 0.75) {
       tips.add(
-          'Arm swing asymmetry detected (${(armSym * 100).toInt()}%). Check for compensatory patterns or carry items.');
+        'Arm swing asymmetry detected (${(armSym * 100).toInt()}%). Check for compensatory patterns or carry items.',
+      );
     }
 
     final footStrike = detectFootStrike();
     if (footStrike == FootStrikeDetection.heel) {
       tips.add(
-          'Heel striking detected. Try landing with feet under your center of mass.');
+        'Heel striking detected. Try landing with feet under your center of mass.',
+      );
     }
 
     if (tips.isEmpty) {
-      tips.add('Excellent running form! Maintain consistency and focus on gradual progression.');
+      tips.add(
+        'Excellent running form! Maintain consistency and focus on gradual progression.',
+      );
     }
 
     return tips;
@@ -524,7 +559,9 @@ class GaitMetricsCalculator {
   double _standardDeviation(List<double> data) {
     if (data.length < 2) return 0;
     final mean = data.reduce((a, b) => a + b) / data.length;
-    final variance = data.map((d) => math.pow(d - mean, 2)).reduce((a, b) => a + b) / data.length;
+    final variance =
+        data.map((d) => math.pow(d - mean, 2)).reduce((a, b) => a + b) /
+        data.length;
     return math.sqrt(variance);
   }
 
@@ -549,11 +586,7 @@ class PoseLandmark {
   final double y; // Normalized [0.0, 1.0]
   final double z; // Depth (relative)
 
-  const PoseLandmark({
-    required this.x,
-    required this.y,
-    this.z = 0.0,
-  });
+  const PoseLandmark({required this.x, required this.y, this.z = 0.0});
 
   factory PoseLandmark.fromMap(Map<String, dynamic> map) {
     return PoseLandmark(
@@ -578,9 +611,4 @@ class _PoseFrame {
 }
 
 /// Foot strike detection result
-enum FootStrikeDetection {
-  heel,
-  midfoot,
-  forefoot,
-  unknown,
-}
+enum FootStrikeDetection { heel, midfoot, forefoot, unknown }
