@@ -1,6 +1,9 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 import '../core/config/env.dart';
 import 'models/form_analysis_result.dart';
 
@@ -23,6 +26,7 @@ enum TFLiteModel {
 class TFLiteModelService {
   late final Dio _dio;
   final Map<String, Map<String, dynamic>> _normParams = {};
+  final Map<TFLiteModel, Interpreter> _interpreters = {};
   bool _initialized = false;
   bool _serverAvailable = false;
 
@@ -32,7 +36,7 @@ class TFLiteModelService {
   /// Whether the ML server is reachable
   bool get isServerAvailable => _serverAvailable;
 
-  /// Initialize the service — load normalization params if available
+  /// Initialize the service — load normalization params and download models
   Future<void> initialize() async {
     if (_initialized) return;
 
@@ -49,64 +53,172 @@ class TFLiteModelService {
     );
 
     try {
-      // Check server health first
-      final healthResp = await _dio.get('/api/v1/gait/injury-risk',
-          queryParameters: {'check': 'health'}).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => throw Exception('Health check timed out'),
-      );
-      _serverAvailable = healthResp.statusCode == 200 ||
-          healthResp.statusCode == 422; // 422 = validation error (server is up)
+      // Check server health
+      final healthResp = await _dio
+          .get('/api/v1/gait/injury-risk', queryParameters: {'check': 'health'})
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw Exception('Health check timed out'),
+          );
+      _serverAvailable =
+          healthResp.statusCode == 200 || healthResp.statusCode == 422;
 
       if (_serverAvailable) {
         for (final model in TFLiteModel.values) {
           await _loadNormalizationParams(model);
+          await _downloadAndInitModel(model);
         }
       }
-      debugPrint('TFLiteModelService: Initialized — '
-          'server=${_serverAvailable ? "online" : "offline"}, '
-          'models=${_normParams.length}');
+
+      debugPrint(
+        'TFLiteModelService: Initialized — '
+        'server=${_serverAvailable ? "online" : "offline"}, '
+        'local_models=${_interpreters.length}',
+      );
     } catch (e) {
       _serverAvailable = false;
-      debugPrint('TFLiteModelService: Init warning — $e (using on-device rules)');
+      debugPrint(
+        'TFLiteModelService: Init warning — $e (using on-device rules)',
+      );
     }
     _initialized = true;
   }
 
-  /// Load normalization parameters for a model from server
-  Future<void> _loadNormalizationParams(TFLiteModel model) async {
+  /// Download model from server and initialize TFLite interpreter
+  Future<void> _downloadAndInitModel(TFLiteModel model) async {
     try {
-      final response = await _dio.get(
-        '/api/v1/models/${model.apiName}/normalization',
-      );
-      if (response.statusCode == 200) {
-        _normParams[model.apiName] = Map<String, dynamic>.from(response.data);
+      final appDir = await getApplicationDocumentsDirectory();
+      final modelFile = File('${appDir.path}/${model.filename}');
+
+      // If model doesn't exist locally, download it
+      if (!await modelFile.exists()) {
+        debugPrint('TFLiteModelService: Downloading ${model.apiName}...');
+        await _dio.download('/api/v1/models/${model.filename}', modelFile.path);
       }
+
+      // Initialize Interpreter
+      final interpreter = Interpreter.fromFile(modelFile);
+      _interpreters[model] = interpreter;
     } catch (e) {
-      debugPrint('TFLiteModelService: Could not load norm params for ${model.apiName}');
+      debugPrint(
+        'TFLiteModelService: Could not init local model ${model.apiName}: $e',
+      );
     }
   }
 
-  /// Run prediction using server-side TFLite inference with on-device fallback
-  ///
-  /// Tries server inference first if available, otherwise uses
-  /// highly-tuned rule-based on-device prediction.
+  Future<void> _loadNormalizationParams(TFLiteModel model) async {
+    try {
+      final response = await _dio.get(
+        '/api/v1/models/${model.apiName}_norm_params.json',
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        _normParams[model.apiName] = Map<String, dynamic>.from(response.data);
+      }
+    } catch (e) {
+      debugPrint(
+        'TFLiteModelService: No normalization params for ${model.apiName}: $e',
+      );
+    }
+  }
+
+  /// Run prediction using local TFLite engine with server/rule fallback
   Future<Map<String, dynamic>> predict(
     TFLiteModel model,
     List<double> features,
   ) async {
-    // If server is known to be unavailable, skip directly to rules
-    if (!_serverAvailable) {
-      return _ruleBasedFallback(model, features);
+    // 1. Try Local TFLite Inference first (Fastest/Offline)
+    if (_interpreters.containsKey(model)) {
+      try {
+        return _runLocalInference(model, features);
+      } catch (e) {
+        debugPrint(
+          'TFLiteModelService: Local inference failed for ${model.apiName}: $e',
+        );
+      }
     }
 
-    try {
-      return await _serverInference(model, features);
-    } catch (e) {
-      debugPrint('TFLiteModelService: Server inference failed — using on-device rules: $e');
-      _serverAvailable = false; // Cache failure to avoid repeated timeouts
-      return _ruleBasedFallback(model, features);
+    // 2. Try Server Inference if online
+    if (_serverAvailable) {
+      try {
+        return await _serverInference(model, features);
+      } catch (e) {
+        debugPrint('TFLiteModelService: Server inference failed: $e');
+        _serverAvailable = false;
+      }
     }
+
+    // 3. Last Resort: Rule-based fallback
+    return _ruleBasedFallback(model, features);
+  }
+
+  /// Execute on-device TFLite inference
+  Map<String, dynamic> _runLocalInference(
+    TFLiteModel model,
+    List<double> features,
+  ) {
+    final interpreter = _interpreters[model]!;
+
+    // Normalize features if params available
+    List<double> normalizedFeatures = features;
+    final params = _normParams[model.apiName];
+    if (params != null) {
+      final means = List<double>.from(params['mean']);
+      final stds = List<double>.from(params['std']);
+      normalizedFeatures = List.generate(features.length, (i) {
+        return (features[i] - means[i]) / stds[i];
+      });
+    }
+
+    // Prepare input (Tensor 1xN) and output (Tensor 1xM)
+    final input = [normalizedFeatures];
+    final output = List.filled(
+      interpreter.getOutputTensors().first.shape.last,
+      0.0,
+    ).reshape([1, -1]);
+
+    interpreter.run(input, output);
+    final prediction = List<double>.from(output[0]);
+
+    // Reuse the interpretation logic from the backend (implemented here in Dart)
+    // In a real app, this would be a shared utility or duplicated logic.
+    return _interpretLocalPrediction(model.apiName, prediction, features);
+  }
+
+  Map<String, dynamic> _interpretLocalPrediction(
+    String modelName,
+    List<double> prediction,
+    List<double> features,
+  ) {
+    // Ported interpretation logic from main.py
+    if (modelName == 'gait_form') {
+      final score = prediction[0].clamp(0, 100);
+      final level = score >= 80
+          ? 'excellent'
+          : score >= 60
+          ? 'good'
+          : score >= 40
+          ? 'needs_work'
+          : 'poor';
+      return {'form_score': score, 'level': level};
+    } else if (modelName == 'injury_risk') {
+      final levels = ['low', 'moderate', 'high'];
+      int maxIdx = 0;
+      double maxVal = prediction[0];
+      for (int i = 1; i < prediction.length; i++) {
+        if (prediction[i] > maxVal) {
+          maxVal = prediction[i];
+          maxIdx = i;
+        }
+      }
+      return {'risk_level': levels[maxIdx], 'confidence': maxVal * 100};
+    } else if (modelName == 'performance') {
+      final t5k = prediction[0];
+      return {
+        'predicted_5k_seconds': t5k.toInt(),
+        'predicted_10k_seconds': (t5k * math.pow(10 / 5, 1.06)).toInt(),
+      };
+    }
+    return {};
   }
 
   /// Analyze form analysis results and return injury risk + gait score
@@ -121,37 +233,42 @@ class TFLiteModelService {
   }) async {
     // Build feature vectors from form analysis result
     final gaitFeatures = [
-      result.groundContactTimeMs,           // [0] GCT ms
-      result.verticalOscillationCm,         // [1] Vertical osc cm
-      result.cadenceSpm.toDouble(),          // [2] Cadence spm
-      result.strideLengthM,                 // [3] Stride length m
-      result.forwardLeanDeg ?? 8.0,         // [4] Forward lean deg
-      result.hipDropDeg ?? 3.0,             // [5] Hip drop deg
-      (result.armSwingSymmetryPct ?? 90),    // [6] Arm swing symmetry %
-      result.formScore.toDouble(),          // [7] Raw form score
+      result.groundContactTimeMs, // [0] GCT ms
+      result.verticalOscillationCm, // [1] Vertical osc cm
+      result.cadenceSpm.toDouble(), // [2] Cadence spm
+      result.strideLengthM, // [3] Stride length m
+      result.forwardLeanDeg ?? 8.0, // [4] Forward lean deg
+      result.hipDropDeg ?? 3.0, // [5] Hip drop deg
+      (result.armSwingSymmetryPct ?? 90), // [6] Arm swing symmetry %
+      result.formScore.toDouble(), // [7] Raw form score
     ];
 
     final injuryFeatures = [
-      result.groundContactTimeMs,            // [0] GCT ms
-      result.verticalOscillationCm,          // [1] Vertical osc cm
-      result.cadenceSpm.toDouble(),          // [2] Cadence spm
-      result.forwardLeanDeg ?? 8.0,          // [3] Forward lean deg
-      result.hipDropDeg ?? 3.0,              // [4] Hip drop deg
-      weeklyDistanceKm,                      // [5] Weekly distance km
-      acwr,                                  // [6] ACWR ratio
+      result.groundContactTimeMs, // [0] GCT ms
+      result.verticalOscillationCm, // [1] Vertical osc cm
+      result.cadenceSpm.toDouble(), // [2] Cadence spm
+      result.forwardLeanDeg ?? 8.0, // [3] Forward lean deg
+      result.hipDropDeg ?? 3.0, // [4] Hip drop deg
+      weeklyDistanceKm, // [5] Weekly distance km
+      acwr, // [6] ACWR ratio
     ];
 
     final gaitResult = await predict(TFLiteModel.gaitForm, gaitFeatures);
     final injuryResult = await predict(TFLiteModel.injuryRisk, injuryFeatures);
 
     return FormAnalysisPrediction(
-      formScore: (gaitResult['form_score'] as num?)?.toDouble() ??
+      formScore:
+          (gaitResult['form_score'] as num?)?.toDouble() ??
           result.formScore.toDouble(),
       formLevel: gaitResult['level'] as String? ?? 'unknown',
       injuryRiskLevel: injuryResult['risk_level'] as String? ?? 'unknown',
       injuryRiskConfidence:
           (injuryResult['confidence'] as num?)?.toDouble() ?? 50.0,
-      recommendations: _generateRecommendations(gaitResult, injuryResult, result),
+      recommendations: _generateRecommendations(
+        gaitResult,
+        injuryResult,
+        result,
+      ),
     );
   }
 
@@ -165,26 +282,36 @@ class TFLiteModelService {
     final riskLevel = injuryResult['risk_level'] as String? ?? 'unknown';
 
     if (riskLevel == 'high') {
-      tips.add('⚠️ High injury risk detected. Consider reducing training volume by 20-30% this week.');
+      tips.add(
+        '⚠️ High injury risk detected. Consider reducing training volume by 20-30% this week.',
+      );
     } else if (riskLevel == 'moderate') {
       tips.add('Monitor training load closely. Include extra recovery days.');
     }
 
     if (formResult.groundContactTimeMs > 280) {
-      tips.add('Focus on quick, light foot strikes to reduce ground contact time from ${formResult.groundContactTimeMs.toInt()}ms toward 220ms.');
+      tips.add(
+        'Focus on quick, light foot strikes to reduce ground contact time from ${formResult.groundContactTimeMs.toInt()}ms toward 220ms.',
+      );
     }
 
     if (formResult.cadenceSpm < 170) {
-      tips.add('Increase cadence from ${formResult.cadenceSpm} to 175+ spm using a metronome app during easy runs.');
+      tips.add(
+        'Increase cadence from ${formResult.cadenceSpm} to 175+ spm using a metronome app during easy runs.',
+      );
     }
 
     if ((formResult.hipDropDeg ?? 0) > 8) {
-      tips.add('Excessive hip drop (${formResult.hipDropDeg!.toStringAsFixed(1)}°). Add clamshells and single-leg deadlifts to strengthen glutes.');
+      tips.add(
+        'Excessive hip drop (${formResult.hipDropDeg!.toStringAsFixed(1)}°). Add clamshells and single-leg deadlifts to strengthen glutes.',
+      );
     }
 
     final score = (gaitResult['form_score'] as num?)?.toDouble() ?? 0;
     if (score >= 80) {
-      tips.add('Excellent form! Focus on consistency and gradual speed progression.');
+      tips.add(
+        'Excellent form! Focus on consistency and gradual speed progression.',
+      );
     }
 
     if (tips.isEmpty) {
@@ -201,10 +328,7 @@ class TFLiteModelService {
   ) async {
     final response = await _dio.post(
       '/api/v1/inference',
-      data: {
-        'model': model.apiName,
-        'features': features,
-      },
+      data: {'model': model.apiName, 'features': features},
     );
 
     if (response.statusCode == 200) {
@@ -242,14 +366,14 @@ class TFLiteModelService {
   Map<String, dynamic> _gaitFormFallback(List<double> features) {
     if (features.length < 8) return {'form_score': 50.0, 'level': 'unknown'};
 
-    final gct = features[0];        // Ground Contact Time ms
-    final osc = features[1];        // Vertical Oscillation cm
-    final cadence = features[2];    // Cadence spm
+    final gct = features[0]; // Ground Contact Time ms
+    final osc = features[1]; // Vertical Oscillation cm
+    final cadence = features[2]; // Cadence spm
     // features[3] = stride length (not used directly in scoring)
-    final lean = features[4];       // Forward lean deg
-    final hipDrop = features[5];    // Hip drop deg
-    final armSym = features[6];     // Arm swing symmetry %
-    final rawScore = features[7];   // Raw form score from GaitMetrics
+    final lean = features[4]; // Forward lean deg
+    final hipDrop = features[5]; // Hip drop deg
+    final armSym = features[6]; // Arm swing symmetry %
+    final rawScore = features[7]; // Raw form score from GaitMetrics
 
     double score = 0;
 
@@ -320,23 +444,27 @@ class TFLiteModelService {
     score = score.clamp(0, 100).roundToDouble();
 
     // Blend with raw GaitMetrics score for stability
-    final blended = (score * 0.7 + rawScore * 0.3).clamp(0, 100).roundToDouble();
+    final blended = (score * 0.7 + rawScore * 0.3)
+        .clamp(0, 100)
+        .roundToDouble();
 
     final level = blended >= 85
         ? 'excellent'
         : blended >= 70
-            ? 'good'
-            : blended >= 50
-                ? 'average'
-                : blended >= 35
-                    ? 'needs_work'
-                    : 'poor';
+        ? 'good'
+        : blended >= 50
+        ? 'average'
+        : blended >= 35
+        ? 'needs_work'
+        : 'poor';
 
     return {
       'form_score': blended,
       'level': level,
       'component_scores': {
-        'cadence': (cadence >= 170 && cadence <= 190) ? 'optimal' : 'suboptimal',
+        'cadence': (cadence >= 170 && cadence <= 190)
+            ? 'optimal'
+            : 'suboptimal',
         'gct': gct < 250 ? 'good' : 'high',
         'oscillation': osc < 10 ? 'efficient' : 'wasteful',
         'hip_stability': hipDrop < 6 ? 'stable' : 'weak',
@@ -368,7 +496,9 @@ class TFLiteModelService {
     // GCT risk: > 300ms indicates overstriding/braking
     if (gct > 300) {
       riskScore += 0.15;
-      riskFactors.add('High ground contact time (${gct.toInt()}ms) — overstriding risk');
+      riskFactors.add(
+        'High ground contact time (${gct.toInt()}ms) — overstriding risk',
+      );
     } else if (gct > 260) {
       riskScore += 0.08;
     }
@@ -376,7 +506,9 @@ class TFLiteModelService {
     // Vertical oscillation risk: > 12cm = excessive bouncing
     if (osc > 12) {
       riskScore += 0.12;
-      riskFactors.add('Excessive vertical bounce (${osc.toStringAsFixed(1)}cm) — impact loading');
+      riskFactors.add(
+        'Excessive vertical bounce (${osc.toStringAsFixed(1)}cm) — impact loading',
+      );
     } else if (osc > 10) {
       riskScore += 0.05;
     }
@@ -384,7 +516,9 @@ class TFLiteModelService {
     // Low cadence risk: < 165 spm = longer ground contact, more load
     if (cadence < 160) {
       riskScore += 0.12;
-      riskFactors.add('Low cadence (${cadence.toInt()} spm) — increased load per step');
+      riskFactors.add(
+        'Low cadence (${cadence.toInt()} spm) — increased load per step',
+      );
     } else if (cadence < 170) {
       riskScore += 0.05;
     }
@@ -392,7 +526,9 @@ class TFLiteModelService {
     // Hip drop risk: > 8° = glute weakness (Trendelenburg positive)
     if (hipDrop > 10) {
       riskScore += 0.18;
-      riskFactors.add('Excessive hip drop (${hipDrop.toStringAsFixed(1)}°) — ITB/knee risk');
+      riskFactors.add(
+        'Excessive hip drop (${hipDrop.toStringAsFixed(1)}°) — ITB/knee risk',
+      );
     } else if (hipDrop > 7) {
       riskScore += 0.10;
       riskFactors.add('Moderate hip drop detected');
@@ -401,7 +537,9 @@ class TFLiteModelService {
     // Forward lean risk: > 15° = lower back strain
     if (lean > 18) {
       riskScore += 0.10;
-      riskFactors.add('Excessive forward lean (${lean.toStringAsFixed(1)}°) — back strain risk');
+      riskFactors.add(
+        'Excessive forward lean (${lean.toStringAsFixed(1)}°) — back strain risk',
+      );
     } else if (lean < 2) {
       riskScore += 0.05;
       riskFactors.add('Insufficient forward lean — inefficient posture');
@@ -410,10 +548,14 @@ class TFLiteModelService {
     // ACWR risk: > 1.5 = acute spike (Banister model)
     if (acwr > 1.5) {
       riskScore += 0.25;
-      riskFactors.add('Training load spike (ACWR: ${acwr.toStringAsFixed(2)}) — high overuse risk');
+      riskFactors.add(
+        'Training load spike (ACWR: ${acwr.toStringAsFixed(2)}) — high overuse risk',
+      );
     } else if (acwr > 1.3) {
       riskScore += 0.12;
-      riskFactors.add('Elevated ACWR (${acwr.toStringAsFixed(2)}) — monitor closely');
+      riskFactors.add(
+        'Elevated ACWR (${acwr.toStringAsFixed(2)}) — monitor closely',
+      );
     }
 
     // Weekly volume risk
@@ -426,10 +568,13 @@ class TFLiteModelService {
     final level = riskScore >= 0.55
         ? 'high'
         : riskScore >= 0.25
-            ? 'moderate'
-            : 'low';
+        ? 'moderate'
+        : 'low';
 
-    final confidence = math.min(90.0, 50.0 + (features.where((f) => f > 0).length * 6));
+    final confidence = math.min(
+      90.0,
+      50.0 + (features.where((f) => f > 0).length * 6),
+    );
 
     return {
       'risk_level': level,
@@ -466,7 +611,11 @@ class TFLiteModelService {
       'predicted_half_marathon_seconds': tHalf,
       'predicted_marathon_seconds': tMarathon,
       'estimated_vo2max': vo2max.roundToDouble(),
-      'race_readiness': pace < 5.5 ? 'competitive' : pace < 7.0 ? 'recreational' : 'building_base',
+      'race_readiness': pace < 5.5
+          ? 'competitive'
+          : pace < 7.0
+          ? 'recreational'
+          : 'building_base',
     };
   }
 

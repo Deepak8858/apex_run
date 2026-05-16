@@ -8,6 +8,7 @@ import main
 
 def test_health_reports_runtime_metadata():
     client = TestClient(main.app)
+    expected_models = len(list(main.MODELS_DIR.glob("*.tflite")))
 
     response = client.get("/health")
 
@@ -16,7 +17,7 @@ def test_health_reports_runtime_metadata():
         "status": "ok",
         "service": "ml-service",
         "version": main.APP_VERSION,
-        "models_available": 0,
+        "models_available": expected_models,
     }
 
 

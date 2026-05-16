@@ -13,6 +13,8 @@ class GpsPoint with _$GpsPoint {
     @Default(0.0) double accuracy,
     @Default(0.0) double speed,
     required DateTime timestamp,
+    double? stiffnessIndex,
+    double? peakKneeFlexion,
   }) = _GpsPoint;
 
   factory GpsPoint.fromJson(Map<String, dynamic> json) =>

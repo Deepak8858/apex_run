@@ -32,34 +32,89 @@ type Claims struct {
 
 // jwksCache stores cached JWKS keys to avoid hitting the endpoint per request.
 type jwksCache struct {
-	mu        sync.RWMutex
-	keys      map[string]*ecdsa.PublicKey
-	fetchedAt time.Time
-	ttl       time.Duration
+	mu          sync.RWMutex
+	keys        map[string]*ecdsa.PublicKey
+	fetchedAt   time.Time
+	ttl         time.Duration
+	refreshing  bool
+	refreshCond *sync.Cond
 }
 
 func newJWKSCache(ttl time.Duration) *jwksCache {
-	return &jwksCache{
+	c := &jwksCache{
 		keys: make(map[string]*ecdsa.PublicKey),
 		ttl:  ttl,
 	}
+	c.refreshCond = sync.NewCond(&c.mu)
+	return c
 }
 
-func (c *jwksCache) get(kid string) (*ecdsa.PublicKey, bool) {
+func (c *jwksCache) get(kid string, supabaseURL string, logger *zap.Logger) (*ecdsa.PublicKey, error) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if time.Since(c.fetchedAt) > c.ttl {
-		return nil, false
-	}
 	key, ok := c.keys[kid]
-	return key, ok
-}
+	fresh := time.Since(c.fetchedAt) < c.ttl
+	c.mu.RUnlock()
 
-func (c *jwksCache) set(keys map[string]*ecdsa.PublicKey) {
+	if ok && fresh {
+		return key, nil
+	}
+
+	// Lock for refresh logic
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	// Check again in case someone else refreshed while we were waiting for lock
+	if key, ok := c.keys[kid]; ok && time.Since(c.fetchedAt) < c.ttl {
+		c.mu.Unlock()
+		return key, nil
+	}
+
+	// If already refreshing, wait
+	if c.refreshing {
+		for c.refreshing {
+			c.refreshCond.Wait()
+		}
+		// Try again after waiting
+		key, ok := c.keys[kid]
+		c.mu.Unlock()
+		if !ok {
+			return nil, errors.New("unknown signing key after refresh")
+		}
+		return key, nil
+	}
+
+	// We are the lucky one to refresh
+	c.refreshing = true
+	c.mu.Unlock()
+
+	defer func() {
+		c.mu.Lock()
+		c.refreshing = false
+		c.refreshCond.Broadcast()
+		c.mu.Unlock()
+	}()
+
+	keys, err := fetchJWKS(supabaseURL)
+	if err != nil {
+		logger.Error("JWKS refresh failed", zap.Error(err))
+		// Return existing key even if stale if it matches the kid
+		c.mu.RLock()
+		key, ok := c.keys[kid]
+		c.mu.RUnlock()
+		if ok {
+			return key, nil
+		}
+		return nil, fmt.Errorf("unable to verify token (JWKS unavailable): %w", err)
+	}
+
+	c.mu.Lock()
 	c.keys = keys
 	c.fetchedAt = time.Now()
+	key, ok = c.keys[kid]
+	c.mu.Unlock()
+
+	if !ok {
+		return nil, errors.New("unknown signing key after refresh")
+	}
+	return key, nil
 }
 
 // jwksResponse represents the JSON Web Key Set response.
@@ -131,7 +186,10 @@ func Middleware(supabaseURL, jwtSecret string, logger *zap.Logger) gin.HandlerFu
 	if keys, err := fetchJWKS(supabaseURL); err != nil {
 		logger.Warn("initial JWKS fetch failed — will retry on first request", zap.Error(err))
 	} else {
-		cache.set(keys)
+		cache.mu.Lock()
+		cache.keys = keys
+		cache.fetchedAt = time.Now()
+		cache.mu.Unlock()
 		logger.Info("JWKS loaded", zap.Int("keys", len(keys)))
 	}
 
@@ -169,25 +227,12 @@ func Middleware(supabaseURL, jwtSecret string, logger *zap.Logger) gin.HandlerFu
 		switch unverified.Method.Alg() {
 		case "ES256":
 			kid, _ := unverified.Header["kid"].(string)
-			pubKey, ok := cache.get(kid)
-			if !ok {
-				// Refresh JWKS
-				keys, err := fetchJWKS(supabaseURL)
-				if err != nil {
-					logger.Error("JWKS refresh failed", zap.Error(err))
-					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-						"error": "unable to verify token (JWKS unavailable)",
-					})
-					return
-				}
-				cache.set(keys)
-				pubKey, ok = keys[kid]
-				if !ok {
-					c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-						"error": "unknown signing key",
-					})
-					return
-				}
+			pubKey, err := cache.get(kid, supabaseURL, logger)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"error": err.Error(),
+				})
+				return
 			}
 
 			claims = &Claims{}

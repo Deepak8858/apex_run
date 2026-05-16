@@ -21,6 +21,7 @@ class RouteMapWidget extends StatefulWidget {
   final bool animateRoute;
   final double initialZoom;
   final EdgeInsets padding;
+  final String styleUri;
 
   const RouteMapWidget({
     super.key,
@@ -30,6 +31,7 @@ class RouteMapWidget extends StatefulWidget {
     this.animateRoute = false,
     this.initialZoom = 15.0,
     this.padding = const EdgeInsets.all(50),
+    this.styleUri = MapboxStyles.DARK,
   });
 
   @override
@@ -40,7 +42,10 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
   PolylineAnnotationManager? _glowManager;
+  PolylineAnnotationManager? _riskManager;
   PointAnnotationManager? _pointManager;
+  PolylineAnnotation? _mainLine;
+  PolylineAnnotation? _glowLine;
   Timer? _animTimer;
   int _animIndex = 0;
 
@@ -58,7 +63,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
       mapOptions: MapOptions(
         pixelRatio: MediaQuery.of(context).devicePixelRatio,
       ),
-      styleUri: MapboxStyles.DARK,
+      styleUri: widget.styleUri,
       cameraOptions: _initialCamera(),
       onMapCreated: _onMapCreated,
     );
@@ -95,6 +100,8 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     // Create glow manager first (renders behind main line)
     _glowManager =
         await map.annotations.createPolylineAnnotationManager();
+    _riskManager =
+        await map.annotations.createPolylineAnnotationManager();
     _polylineManager =
         await map.annotations.createPolylineAnnotationManager();
     _pointManager = await map.annotations.createPointAnnotationManager();
@@ -109,6 +116,13 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   @override
   void didUpdateWidget(covariant RouteMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.styleUri != oldWidget.styleUri) {
+      _mapboxMap?.loadStyleURI(widget.styleUri);
+      _mainLine = null;
+      _glowLine = null;
+      // Ensure annotations are redrawn after style change as they might be cleared or hidden
+      Future.delayed(const Duration(milliseconds: 500), () => _drawRoute());
+    }
     if (widget.routePoints.length != oldWidget.routePoints.length) {
       _drawRoute();
       if (widget.isLiveTracking && widget.routePoints.isNotEmpty) {
@@ -173,31 +187,42 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
   Future<void> _drawRoute() async {
     if (_polylineManager == null || widget.routePoints.length < 2) return;
 
-    // Clear existing annotations
-    await _polylineManager!.deleteAll();
-    await _glowManager?.deleteAll();
-    await _pointManager?.deleteAll();
-
-    // Draw polyline
     final coordinates = widget.routePoints
         .map((p) => Position(p.longitude, p.latitude))
         .toList();
+    final geometry = LineString(coordinates: coordinates);
 
-    // Outer glow line (Strava-style neon effect)
-    await _glowManager?.create(PolylineAnnotationOptions(
-      geometry: LineString(coordinates: coordinates),
-      lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
-      lineWidth: 10.0,
-      lineOpacity: 0.4,
-    ));
+    // Optimized Update Pattern: 
+    // Instead of deleteAll(), we update the existing annotation geometry.
+    // This is significantly more performant for long activities.
+    if (_mainLine != null && _glowLine != null) {
+      _mainLine!.geometry = geometry;
+      _glowLine!.geometry = geometry;
+      await _polylineManager!.update(_mainLine!);
+      await _glowManager!.update(_glowLine!);
+      await _drawRiskSegments();
+    } else {
+      // First time draw or after style change
+      await _polylineManager!.deleteAll();
+      await _glowManager!.deleteAll();
+      await _riskManager!.deleteAll();
 
-    // Main route line
-    await _polylineManager!.create(PolylineAnnotationOptions(
-      geometry: LineString(coordinates: coordinates),
-      lineColor: AppTheme.electricLime.toARGB32(),
-      lineWidth: 4.0,
-      lineOpacity: 0.95,
-    ));
+      _glowLine = await _glowManager?.create(PolylineAnnotationOptions(
+        geometry: geometry,
+        lineColor: AppTheme.electricLime.withAlpha(60).toARGB32(),
+        lineWidth: 10.0,
+        lineOpacity: 0.4,
+      ));
+
+      _mainLine = await _polylineManager!.create(PolylineAnnotationOptions(
+        geometry: geometry,
+        lineColor: AppTheme.electricLime.toARGB32(),
+        lineWidth: 4.0,
+        lineOpacity: 0.95,
+      ));
+
+      await _drawRiskSegments();
+    }
 
     _drawMarkers();
 
@@ -238,8 +263,16 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     }
   }
 
+  DateTime _lastFlyTime = DateTime.fromMillisecondsSinceEpoch(0);
+
   Future<void> _flyToLatest() async {
     if (_mapboxMap == null || widget.routePoints.isEmpty) return;
+
+    // Throttle camera movements to once every 10 seconds during tracking
+    // to prevent jerky UX and allow users to pan manually.
+    final now = DateTime.now();
+    if (now.difference(_lastFlyTime) < const Duration(seconds: 10)) return;
+    _lastFlyTime = now;
 
     final latest = widget.routePoints.last;
     await _mapboxMap!.flyTo(
@@ -248,7 +281,7 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
             Point(coordinates: Position(latest.longitude, latest.latitude)),
         zoom: 16.0,
       ),
-      MapAnimationOptions(duration: 500),
+      MapAnimationOptions(duration: 1000),
     );
   }
 
@@ -281,11 +314,41 @@ class _RouteMapWidgetState extends State<RouteMapWidget> {
     _mapboxMap!.setCamera(camera);
   }
 
+  /// Phase 4a: Dynamic Layers
+  /// Colors segments based on biomechanical risk (Stiffness / Knee Flexion)
+  Future<void> _drawRiskSegments() async {
+    if (_riskManager == null || widget.routePoints.length < 2) return;
+    await _riskManager!.deleteAll();
+
+    for (int i = 0; i < widget.routePoints.length - 1; i++) {
+      final p1 = widget.routePoints[i];
+      final p2 = widget.routePoints[i + 1];
+
+      // Check for high risk indicators
+      // Stiffness < 3.0 or Flexion < 158 indicates potential form breakdown
+      bool isHighRisk = (p2.stiffnessIndex != null && p2.stiffnessIndex! < 3.0) ||
+                        (p2.peakKneeFlexion != null && p2.peakKneeFlexion! < 158);
+
+      if (isHighRisk) {
+        await _riskManager!.create(PolylineAnnotationOptions(
+          geometry: LineString(coordinates: [
+            Position(p1.longitude, p1.latitude),
+            Position(p2.longitude, p2.latitude),
+          ]),
+          lineColor: AppTheme.error.toARGB32(),
+          lineWidth: 6.0,
+          lineOpacity: 1.0,
+        ));
+      }
+    }
+  }
+
   @override
   void dispose() {
     _animTimer?.cancel();
     _polylineManager = null;
     _glowManager = null;
+    _riskManager = null;
     _pointManager = null;
     super.dispose();
   }

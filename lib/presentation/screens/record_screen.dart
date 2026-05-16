@@ -2,13 +2,18 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/permission_utils.dart';
 import '../../domain/models/activity.dart';
 import '../../domain/models/tracking_metrics.dart';
 import '../providers/app_providers.dart';
 import '../providers/tracking_provider.dart';
+import '../../ml/ghost_racing_controller.dart';
+import '../../ml/ml_providers.dart';
 import '../widgets/route_map_widget.dart';
+import '../widgets/ghost_racing_overlay.dart';
+import '../widgets/routing_safety_alert.dart';
 import 'activity_detail_screen.dart';
 
 /// Record Screen - Strava-inspired GPS Activity Tracking
@@ -48,6 +53,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   ];
 
   bool _isLocked = false;
+  bool _isSatelliteMap = false;
   int _currentMetricPage = 0;
   final PageController _metricPageController = PageController();
 
@@ -83,13 +89,11 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(trackingControllerProvider);
-    final metrics = ref.watch(trackingMetricsProvider);
 
     ref.listen<TrackingControllerState>(trackingControllerProvider, (
       prev,
       next,
     ) {
-      // ── Audio coach state transitions ───────────────────────────────
       final coach = ref.read(audioCoachServiceProvider);
       final prevState = prev?.trackingState;
       final nextState = next.trackingState;
@@ -132,16 +136,14 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
       }
     });
 
-    // Per-km / per-mile split announcer. Fires on every metric tick but
-    // [AudioCoachService.maybeAnnounceSplit] gates by whole-unit crossings.
     ref.listen<AsyncValue<TrackingMetrics>>(trackingMetricsProvider, (
       prev,
       next,
     ) {
-      final m = next.valueOrNull;
-      if (m == null) return;
-      if (m.state == TrackingState.tracking) {
-        ref.read(audioCoachServiceProvider).maybeAnnounceSplit(m);
+      final metrics = next.valueOrNull;
+      if (metrics == null) return;
+      if (metrics.state == TrackingState.tracking) {
+        ref.read(audioCoachServiceProvider).maybeAnnounceSplit(metrics);
       }
     });
 
@@ -150,7 +152,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
 
     if (isSaving) return _buildSavingView(context);
     if (isIdle) return _buildIdleView(context);
-    return _buildTrackingView(context, controllerState, metrics);
+    return _buildTrackingView(context, controllerState);
   }
 
   // ============================================================
@@ -227,6 +229,12 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            // Race a Ghost Action
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _GhostRacingCard(onTap: () => _showGhostSelector(context)),
             ),
             const Spacer(),
             _buildStartButton(context),
@@ -331,12 +339,10 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   Widget _buildTrackingView(
     BuildContext context,
     TrackingControllerState controllerState,
-    AsyncValue<TrackingMetrics> metricsAsync,
   ) {
     final isPaused = controllerState.trackingState == TrackingState.paused;
-    final metrics = metricsAsync.valueOrNull ?? const TrackingMetrics();
 
-    if (_isLocked) return _buildLockedView(context, metrics, isPaused);
+    if (_isLocked) return _buildLockedView(context, isPaused);
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -344,14 +350,65 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
         children: [
           // Full-screen map
           Positioned.fill(
-            child: RouteMapWidget(
-              routePoints: metrics.routePoints,
-              isLiveTracking: true,
-              padding: const EdgeInsets.only(
-                top: 80,
-                bottom: 380,
-                left: 40,
-                right: 40,
+            child: Consumer(
+              builder: (context, ref, _) {
+                final points = ref.watch(
+                  trackingMetricsProvider.select(
+                    (m) => m.valueOrNull?.routePoints ?? const [],
+                  ),
+                );
+                return RouteMapWidget(
+                  routePoints: points,
+                  isLiveTracking: true,
+                  styleUri: _isSatelliteMap
+                      ? MapboxStyles.SATELLITE_STREETS
+                      : MapboxStyles.DARK,
+                  padding: const EdgeInsets.only(
+                    top: 80,
+                    bottom: 380,
+                    left: 40,
+                    right: 40,
+                  ),
+                );
+              },
+            ),
+          ),
+          // Map Style Toggle
+          Positioned(
+            top: 100,
+            right: 16,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() => _isSatelliteMap = !_isSatelliteMap);
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _isSatelliteMap
+                        ? AppTheme.electricLime
+                        : AppTheme.surfaceLight.withValues(alpha: 0.8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    _isSatelliteMap
+                        ? Icons.satellite_alt_rounded
+                        : Icons.map_rounded,
+                    color: _isSatelliteMap
+                        ? AppTheme.background
+                        : AppTheme.textPrimary,
+                    size: 22,
+                  ),
+                ),
               ),
             ),
           ),
@@ -388,68 +445,89 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: (isPaused ? AppTheme.warning : AppTheme.success)
-                            .withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                (isPaused ? AppTheme.warning : AppTheme.success)
+                                    .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isPaused
+                                      ? AppTheme.warning
+                                      : AppTheme.success,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isPaused ? 'PAUSED' : 'REC',
+                                style: TextStyle(
+                                  color: isPaused
+                                      ? AppTheme.warning
+                                      : AppTheme.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() => _isLocked = true);
+                          },
+                          child: Container(
+                            width: 36,
+                            height: 36,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isPaused
-                                  ? AppTheme.warning
-                                  : AppTheme.success,
+                              color: AppTheme.surfaceLight.withValues(
+                                alpha: 0.6,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.lock_open_rounded,
+                              size: 18,
+                              color: AppTheme.textSecondary,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isPaused ? 'PAUSED' : 'REC',
-                            style: TextStyle(
-                              color: isPaused
-                                  ? AppTheme.warning
-                                  : AppTheme.success,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        const _GpsSignalIndicator(compact: true),
+                      ],
                     ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        setState(() => _isLocked = true);
+                    const SizedBox(height: 12),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final risk = ref.watch(mockRouteRiskProvider);
+                        return RoutingSafetyAlert(routeRisk: risk);
                       },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.surfaceLight.withValues(alpha: 0.6),
-                        ),
-                        child: const Icon(
-                          Icons.lock_open_rounded,
-                          size: 18,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
                     ),
-                    const SizedBox(width: 8),
-                    const _GpsSignalIndicator(compact: true),
+                    const SizedBox(height: 4),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final ghost = ref.watch(ghostRacingControllerProvider);
+                        return GhostRacingOverlay(ghostStatus: ghost);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -462,7 +540,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             right: 0,
             child: SafeArea(
               top: false,
-              child: _buildMetricsOverlay(context, metrics, isPaused),
+              child: _buildMetricsOverlay(context, isPaused),
             ),
           ),
         ],
@@ -470,24 +548,29 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
     );
   }
 
-  Widget _buildMetricsOverlay(
-    BuildContext context,
-    TrackingMetrics metrics,
-    bool isPaused,
-  ) {
+  Widget _buildMetricsOverlay(BuildContext context, bool isPaused) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // Duration (hero metric)
-        Text(
-          metrics.formattedDuration,
-          style: const TextStyle(
-            fontSize: 72,
-            fontWeight: FontWeight.w100,
-            color: AppTheme.textPrimary,
-            letterSpacing: 4,
-            fontFeatures: [FontFeature.tabularFigures()],
-          ),
+        Consumer(
+          builder: (context, ref, _) {
+            final duration = ref.watch(
+              trackingMetricsProvider.select(
+                (m) => m.valueOrNull?.formattedDuration ?? '00:00',
+              ),
+            );
+            return Text(
+              duration,
+              style: const TextStyle(
+                fontSize: 72,
+                fontWeight: FontWeight.w100,
+                color: AppTheme.textPrimary,
+                letterSpacing: 4,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            );
+          },
         ),
         const SizedBox(height: 2),
         Text(
@@ -507,33 +590,66 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             controller: _metricPageController,
             onPageChanged: (i) => setState(() => _currentMetricPage = i),
             children: [
-              _MetricRow(
-                left: _MetricInfo(
-                  'Distance',
-                  metrics.formattedDistance,
-                  metrics.distanceUnit,
-                  AppTheme.distance,
-                ),
-                right: _MetricInfo(
-                  'Avg Pace',
-                  metrics.formattedPace,
-                  'min/km',
-                  AppTheme.pace,
-                ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final distance = ref.watch(
+                    trackingMetricsProvider.select(
+                      (m) => m.valueOrNull?.formattedDistance ?? '0 m',
+                    ),
+                  );
+                  final unit = ref.watch(
+                    trackingMetricsProvider.select(
+                      (m) => m.valueOrNull?.distanceUnit ?? 'km',
+                    ),
+                  );
+                  final pace = ref.watch(
+                    trackingMetricsProvider.select(
+                      (m) => m.valueOrNull?.formattedPace ?? '--:--',
+                    ),
+                  );
+                  return _MetricRow(
+                    left: _MetricInfo(
+                      'Distance',
+                      distance,
+                      unit,
+                      AppTheme.distance,
+                    ),
+                    right: _MetricInfo(
+                      'Avg Pace',
+                      pace,
+                      'min/km',
+                      AppTheme.pace,
+                    ),
+                  );
+                },
               ),
-              _MetricRow(
-                left: _MetricInfo(
-                  'Speed',
-                  metrics.currentSpeedKmh.toStringAsFixed(1),
-                  'km/h',
-                  AppTheme.elevation,
-                ),
-                right: _MetricInfo(
-                  'GPS Points',
-                  '${metrics.routePoints.length}',
-                  'pts',
-                  AppTheme.info,
-                ),
+              Consumer(
+                builder: (context, ref, _) {
+                  final speed = ref.watch(
+                    trackingMetricsProvider.select(
+                      (m) => m.valueOrNull?.currentSpeedKmh ?? 0,
+                    ),
+                  );
+                  final points = ref.watch(
+                    trackingMetricsProvider.select(
+                      (m) => m.valueOrNull?.routePoints.length ?? 0,
+                    ),
+                  );
+                  return _MetricRow(
+                    left: _MetricInfo(
+                      'Speed',
+                      speed.toStringAsFixed(1),
+                      'km/h',
+                      AppTheme.elevation,
+                    ),
+                    right: _MetricInfo(
+                      'GPS Points',
+                      '$points',
+                      'pts',
+                      AppTheme.info,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -594,6 +710,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           _FinishButton(
             onFinish: () {
               HapticFeedback.heavyImpact();
+              ref.read(selectedGhostActivityProvider.notifier).state = null;
               ref
                   .read(trackingControllerProvider.notifier)
                   .stopAndSaveTracking();
@@ -607,11 +724,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
   // ============================================================
   // LOCKED VIEW
   // ============================================================
-  Widget _buildLockedView(
-    BuildContext context,
-    TrackingMetrics metrics,
-    bool isPaused,
-  ) {
+  Widget _buildLockedView(BuildContext context, bool isPaused) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: GestureDetector(
@@ -625,26 +738,55 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
             child: Column(
               children: [
                 const Spacer(),
-                Text(
-                  metrics.formattedDuration,
-                  style: TextStyle(
-                    fontSize: 80,
-                    fontWeight: FontWeight.w100,
-                    color: AppTheme.textPrimary.withValues(alpha: 0.9),
-                    letterSpacing: 4,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final duration = ref.watch(
+                      trackingMetricsProvider.select(
+                        (m) => m.valueOrNull?.formattedDuration ?? '00:00',
+                      ),
+                    );
+                    return Text(
+                      duration,
+                      style: TextStyle(
+                        fontSize: 80,
+                        fontWeight: FontWeight.w100,
+                        color: AppTheme.textPrimary.withValues(alpha: 0.9),
+                        letterSpacing: 4,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _LockedMetric(
-                      value: metrics.formattedDistance,
-                      unit: metrics.distanceUnit,
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final distance = ref.watch(
+                          trackingMetricsProvider.select(
+                            (m) => m.valueOrNull?.formattedDistance ?? '0 m',
+                          ),
+                        );
+                        final unit = ref.watch(
+                          trackingMetricsProvider.select(
+                            (m) => m.valueOrNull?.distanceUnit ?? 'km',
+                          ),
+                        );
+                        return _LockedMetric(value: distance, unit: unit);
+                      },
                     ),
                     const SizedBox(width: 32),
-                    _LockedMetric(value: metrics.formattedPace, unit: 'min/km'),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final pace = ref.watch(
+                          trackingMetricsProvider.select(
+                            (m) => m.valueOrNull?.formattedPace ?? '--:--',
+                          ),
+                        );
+                        return _LockedMetric(value: pace, unit: 'min/km');
+                      },
+                    ),
                   ],
                 ),
                 const Spacer(),
@@ -726,6 +868,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
+              ref.read(selectedGhostActivityProvider.notifier).state = null;
               ref.read(trackingControllerProvider.notifier).discardTracking();
             },
             child: const Text(
@@ -799,244 +942,110 @@ class _RecordScreenState extends ConsumerState<RecordScreen>
       ),
     );
   }
-}
 
-class _ActivitySavedSheet extends StatefulWidget {
-  const _ActivitySavedSheet({
-    required this.activity,
-    required this.newlyUnlocked,
-    required this.onShare,
-  });
-
-  final Activity activity;
-  final List<String> newlyUnlocked;
-  final Future<void> Function() onShare;
-
-  @override
-  State<_ActivitySavedSheet> createState() => _ActivitySavedSheetState();
-}
-
-class _ActivitySavedSheetState extends State<_ActivitySavedSheet> {
-  late final ConfettiController _confetti;
-
-  @override
-  void initState() {
-    super.initState();
-    _confetti = ConfettiController(duration: const Duration(seconds: 2));
-    if (widget.newlyUnlocked.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _confetti.play());
-    }
-  }
-
-  @override
-  void dispose() {
-    _confetti.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final activity = widget.activity;
-    final unlocked = widget.newlyUnlocked;
-
-    return Stack(
-      alignment: Alignment.topCenter,
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.cardBackground,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.all(24),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceLight,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppTheme.success.withValues(alpha: 0.1),
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    color: AppTheme.success,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  unlocked.isEmpty
-                      ? 'Activity Saved!'
-                      : 'Activity Saved + ${unlocked.length} unlocked!',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (unlocked.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    alignment: WrapAlignment.center,
-                    children: unlocked
-                        .map(
-                          (code) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+  void _showGhostSelector(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: AppTheme.cardBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Select a Ghost',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            Expanded(
+              child: Consumer(
+                builder: (context, ref, _) {
+                  final activities = ref.watch(recentActivitiesProvider);
+                  return activities.when(
+                    data: (list) => ListView.separated(
+                      itemCount: list.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (ctx, i) {
+                        final act = list[i];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(
+                              color: AppTheme.surfaceLight,
                             ),
+                          ),
+                          leading: Container(
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: AppTheme.electricLime.withValues(
-                                alpha: 0.18,
+                                alpha: 0.1,
                               ),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppTheme.electricLime.withValues(
-                                  alpha: 0.5,
+                            ),
+                            child: const Icon(
+                              Icons.directions_run_rounded,
+                              color: AppTheme.electricLime,
+                            ),
+                          ),
+                          title: Text(
+                            act.activityName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            '${act.formattedDistance} • ${act.formattedDuration}',
+                          ),
+                          onTap: () {
+                            ref
+                                    .read(
+                                      selectedGhostActivityProvider.notifier,
+                                    )
+                                    .state =
+                                act;
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Racing against ${act.activityName}! 👻',
                                 ),
+                                backgroundColor: AppTheme.electricLime,
+                                behavior: SnackBarBehavior.floating,
                               ),
-                            ),
-                            child: Text(
-                              code.replaceAll('_', ' ').toUpperCase(),
-                              style: const TextStyle(
-                                color: AppTheme.electricLime,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SavedStat(
-                        label: 'Distance',
-                        value: activity.formattedDistance,
-                      ),
+                            );
+                          },
+                        );
+                      },
                     ),
-                    Expanded(
-                      child: _SavedStat(
-                        label: 'Duration',
-                        value: activity.formattedDuration,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SavedStat(
-                        label: 'Avg Pace',
-                        value: activity.formattedPace,
-                      ),
-                    ),
-                    Expanded(
-                      child: activity.elevationGainMeters != null
-                          ? _SavedStat(
-                              label: 'Elevation',
-                              value:
-                                  '${activity.elevationGainMeters!.toStringAsFixed(0)}m',
-                            )
-                          : const SizedBox(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: widget.onShare,
-                        icon: const Icon(Icons.ios_share_rounded),
-                        label: const Text('Share'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.electricLime,
-                          side: const BorderSide(color: AppTheme.electricLime),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ActivityDetailScreen(activity: activity),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.electricLime,
-                          foregroundColor: AppTheme.background,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: const Text(
-                          'View Details',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Done',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ],
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) =>
+                        Center(child: Text('Error loading ghosts: $e')),
+                  );
+                },
+              ),
             ),
-          ),
-        ),
-        ConfettiWidget(
-          confettiController: _confetti,
-          blastDirectionality: BlastDirectionality.explosive,
-          numberOfParticles: 24,
-          maxBlastForce: 18,
-          minBlastForce: 6,
-          gravity: 0.4,
-          colors: const [
-            Color(0xFFCCFF00),
-            Color(0xFFFFD166),
-            Color(0xFFB8A4FF),
-            Color(0xFF7AD3FF),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -1405,6 +1414,321 @@ class _LockedMetric extends StatelessWidget {
           style: const TextStyle(fontSize: 12, color: AppTheme.textTertiary),
         ),
       ],
+    );
+  }
+}
+
+class _ActivitySavedSheet extends StatefulWidget {
+  const _ActivitySavedSheet({
+    required this.activity,
+    required this.newlyUnlocked,
+    required this.onShare,
+  });
+
+  final Activity activity;
+  final List<String> newlyUnlocked;
+  final Future<void> Function() onShare;
+
+  @override
+  State<_ActivitySavedSheet> createState() => _ActivitySavedSheetState();
+}
+
+class _ActivitySavedSheetState extends State<_ActivitySavedSheet> {
+  late final ConfettiController _confetti;
+
+  @override
+  void initState() {
+    super.initState();
+    _confetti = ConfettiController(duration: const Duration(seconds: 2));
+    if (widget.newlyUnlocked.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _confetti.play());
+    }
+  }
+
+  @override
+  void dispose() {
+    _confetti.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activity = widget.activity;
+    final unlocked = widget.newlyUnlocked;
+
+    return Stack(
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            color: AppTheme.cardBackground,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.success.withValues(alpha: 0.1),
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppTheme.success,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  unlocked.isEmpty
+                      ? 'Activity Saved!'
+                      : 'Activity Saved + ${unlocked.length} unlocked!',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (unlocked.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: unlocked
+                        .map(
+                          (code) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.electricLime.withValues(
+                                alpha: 0.18,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.electricLime.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              code.replaceAll('_', ' ').toUpperCase(),
+                              style: const TextStyle(
+                                color: AppTheme.electricLime,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Distance',
+                        value: activity.formattedDistance,
+                      ),
+                    ),
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Duration',
+                        value: activity.formattedDuration,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SavedStat(
+                        label: 'Avg Pace',
+                        value: activity.formattedPace,
+                      ),
+                    ),
+                    Expanded(
+                      child: activity.elevationGainMeters != null
+                          ? _SavedStat(
+                              label: 'Elevation',
+                              value:
+                                  '${activity.elevationGainMeters!.toStringAsFixed(0)}m',
+                            )
+                          : const SizedBox(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: widget.onShare,
+                        icon: const Icon(Icons.ios_share_rounded),
+                        label: const Text('Share'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.electricLime,
+                          side: const BorderSide(color: AppTheme.electricLime),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ActivityDetailScreen(activity: activity),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.electricLime,
+                          foregroundColor: AppTheme.background,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'View Details',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Done',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        ConfettiWidget(
+          confettiController: _confetti,
+          blastDirectionality: BlastDirectionality.explosive,
+          numberOfParticles: 24,
+          maxBlastForce: 18,
+          minBlastForce: 6,
+          gravity: 0.4,
+          colors: const [
+            Color(0xFFCCFF00),
+            Color(0xFFFFD166),
+            Color(0xFFB8A4FF),
+            Color(0xFF7AD3FF),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// Ghost Racing Widgets
+// ============================================================
+
+class _GhostRacingCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GhostRacingCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.electricLime.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppTheme.electricLime.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.electricLime.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.directions_run_rounded,
+                  color: AppTheme.electricLime,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Race a Ghost',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      'Compete against a friend\'s past run',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.electricLime,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

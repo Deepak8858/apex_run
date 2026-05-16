@@ -9,12 +9,18 @@ import '../../data/services/activity_post_processor.dart';
 import '../../data/services/gps_tracking_service.dart';
 import '../../domain/models/activity.dart';
 import '../../domain/models/tracking_metrics.dart';
+import '../../ml/ml_providers.dart';
 import 'auth_provider.dart';
 import 'app_providers.dart';
 
 /// Provider for the GPS tracking service singleton
 final gpsTrackingServiceProvider = Provider<GpsTrackingService>((ref) {
   final service = GpsTrackingService();
+
+  // Inject gait calculator for dynamic layer telemetry
+  final gaitCalc = ref.watch(gaitCalculatorProvider);
+  service.setGaitCalculator(gaitCalc);
+
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -39,8 +45,8 @@ final activityDataSourceProvider = Provider<ActivityDataSource>((ref) {
 /// Controller for tracking actions (start/pause/resume/stop/save)
 final trackingControllerProvider =
     StateNotifierProvider<TrackingController, TrackingControllerState>((ref) {
-  return TrackingController(ref);
-});
+      return TrackingController(ref);
+    });
 
 class TrackingControllerState {
   final TrackingState trackingState;
@@ -80,15 +86,12 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
 
   TrackingController(this._ref) : super(const TrackingControllerState());
 
-  GpsTrackingService get _service =>
-      _ref.read(gpsTrackingServiceProvider);
+  GpsTrackingService get _service => _ref.read(gpsTrackingServiceProvider);
 
   Future<PermissionResult> startTracking() async {
     final result = await PermissionUtils.requestLocationPermission();
     if (result != PermissionResult.granted) {
-      state = state.copyWith(
-        errorMessage: null,
-      );
+      state = state.copyWith(errorMessage: null);
       return result;
     }
 
@@ -119,20 +122,14 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
     }
 
     var activity = _service.stopTracking(userId: user.id);
-    state = state.copyWith(
-      trackingState: TrackingState.idle,
-      isSaving: true,
-    );
+    state = state.copyWith(trackingState: TrackingState.idle, isSaving: true);
 
     // Phase 4d: Apply privacy shroud — blur route near user's home
     activity = _applyPrivacyShroud(activity);
 
     // Only save if there's meaningful data
     if (activity.distanceMeters < 10 || activity.durationSeconds < 5) {
-      state = state.copyWith(
-        isSaving: false,
-        lastSavedActivity: activity,
-      );
+      state = state.copyWith(isSaving: false, lastSavedActivity: activity);
       return activity;
     }
 
@@ -151,8 +148,9 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
       // achievement evaluator needs the post-save streak count.
       try {
         final streak = _ref.read(streakServiceProvider);
-        final (currentStreak, _) =
-            await streak.markActivityCompleted(activity.startTime);
+        final (currentStreak, _) = await streak.markActivityCompleted(
+          activity.startTime,
+        );
 
         final achievements = _ref.read(achievementServiceProvider);
         final unlocked = await achievements.evaluateForActivity(
@@ -181,15 +179,14 @@ class TrackingController extends StateNotifier<TrackingControllerState> {
         try {
           final coach = _ref.read(audioCoachServiceProvider);
           await coach.announceStop(_service.currentMetrics);
-        } catch (_) {/* TTS failures are non-fatal */}
+        } catch (_) {
+          /* TTS failures are non-fatal */
+        }
 
         return activity.copyWith(id: activityId);
       } catch (e) {
         // Hooks failed but the activity IS saved. Don't surface error.
-        state = state.copyWith(
-          isSaving: false,
-          lastSavedActivity: activity,
-        );
+        state = state.copyWith(isSaving: false, lastSavedActivity: activity);
         return activity.copyWith(id: activityId);
       }
     } catch (e) {

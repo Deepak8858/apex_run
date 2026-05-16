@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/gps_utils.dart';
 import '../../domain/models/activity.dart';
+import '../../ml/ml_providers.dart';
 import '../widgets/route_map_widget.dart';
 import '../widgets/activity_charts.dart';
+import '../widgets/goal_impact_card.dart';
 import '../providers/app_providers.dart';
 
 /// Activity Detail Screen — Phase 4e
@@ -96,8 +98,11 @@ class ActivityDetailScreen extends ConsumerWidget {
                       ),
                       if (activity.isPrivate) ...[
                         const SizedBox(width: 8),
-                        const Icon(Icons.lock_rounded,
-                            size: 14, color: AppTheme.textTertiary),
+                        const Icon(
+                          Icons.lock_rounded,
+                          size: 14,
+                          color: AppTheme.textTertiary,
+                        ),
                       ],
                     ],
                   ),
@@ -117,6 +122,16 @@ class ActivityDetailScreen extends ConsumerWidget {
 
                   const SizedBox(height: 24),
 
+                  // Goal Impact Card
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final summary = ref.watch(mockGoalImpactProvider);
+                      return GoalImpactCard(summary: summary);
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
                   // Pace chart
                   if (hasGps) ...[
                     _SectionLabel(label: 'Pace'),
@@ -126,7 +141,9 @@ class ActivityDetailScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppTheme.surfaceLight.withValues(alpha: 0.3),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.2),
@@ -150,7 +167,9 @@ class ActivityDetailScreen extends ConsumerWidget {
                       decoration: BoxDecoration(
                         color: AppTheme.cardBackground,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppTheme.surfaceLight.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: AppTheme.surfaceLight.withValues(alpha: 0.3),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.2),
@@ -201,8 +220,18 @@ class ActivityDetailScreen extends ConsumerWidget {
 
   String _formatFullDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final d = days[date.weekday - 1];
@@ -229,7 +258,8 @@ class ActivityDetailScreen extends ConsumerWidget {
         backgroundColor: AppTheme.cardBackground,
         title: const Text('Delete Activity?'),
         content: const Text(
-            'This will permanently remove this activity and all associated data.'),
+          'This will permanently remove this activity and all associated data.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -240,9 +270,7 @@ class ActivityDetailScreen extends ConsumerWidget {
               Navigator.pop(ctx);
               if (activity.id != null) {
                 try {
-                  final ds = ref.read(
-                    activityDataSourceForDetailProvider,
-                  );
+                  final ds = ref.read(activityDataSourceForDetailProvider);
                   await ds.deleteActivity(activity.id!);
                   ref.invalidate(recentActivitiesProvider);
                   if (context.mounted) Navigator.pop(context);
@@ -260,8 +288,10 @@ class ActivityDetailScreen extends ConsumerWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('Delete',
-                style: TextStyle(color: AppTheme.error)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppTheme.error),
+            ),
           ),
         ],
       ),
@@ -298,87 +328,96 @@ class _MetricsGrid extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.straighten_rounded,
-                label: 'Distance',
-                value: activity.formattedDistance,
-                color: AppTheme.distance,
-              )),
+                child: _MetricTile(
+                  icon: Icons.straighten_rounded,
+                  label: 'Distance',
+                  value: activity.formattedDistance,
+                  color: AppTheme.distance,
+                ),
+              ),
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.timer_rounded,
-                label: 'Duration',
-                value: activity.formattedDuration,
-                color: AppTheme.electricLime,
-              )),
+                child: _MetricTile(
+                  icon: Icons.timer_rounded,
+                  label: 'Duration',
+                  value: activity.formattedDuration,
+                  color: AppTheme.electricLime,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.speed_rounded,
-                label: 'Avg Pace',
-                value: activity.formattedPace,
-                color: AppTheme.pace,
-              )),
+                child: _MetricTile(
+                  icon: Icons.speed_rounded,
+                  label: 'Avg Pace',
+                  value: activity.formattedPace,
+                  color: AppTheme.pace,
+                ),
+              ),
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.flash_on_rounded,
-                label: 'Max Speed',
-                value: activity.maxSpeedKmh != null
-                    ? '${activity.maxSpeedKmh!.toStringAsFixed(1)} km/h'
-                    : '--',
-                color: AppTheme.warning,
-              )),
+                child: _MetricTile(
+                  icon: Icons.flash_on_rounded,
+                  label: 'Max Speed',
+                  value: activity.maxSpeedKmh != null
+                      ? '${activity.maxSpeedKmh!.toStringAsFixed(1)} km/h'
+                      : '--',
+                  color: AppTheme.warning,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.trending_up_rounded,
-                label: 'Elev Gain',
-                value: activity.elevationGainMeters != null
-                    ? '${activity.elevationGainMeters!.toStringAsFixed(0)} m'
-                    : '--',
-                color: AppTheme.elevation,
-              )),
+                child: _MetricTile(
+                  icon: Icons.trending_up_rounded,
+                  label: 'Elev Gain',
+                  value: activity.elevationGainMeters != null
+                      ? '${activity.elevationGainMeters!.toStringAsFixed(0)} m'
+                      : '--',
+                  color: AppTheme.elevation,
+                ),
+              ),
               Expanded(
-                  child: _MetricTile(
-                icon: Icons.trending_down_rounded,
-                label: 'Elev Loss',
-                value: activity.elevationLossMeters != null
-                    ? '${activity.elevationLossMeters!.toStringAsFixed(0)} m'
-                    : '--',
-                color: AppTheme.elevation,
-              )),
+                child: _MetricTile(
+                  icon: Icons.trending_down_rounded,
+                  label: 'Elev Loss',
+                  value: activity.elevationLossMeters != null
+                      ? '${activity.elevationLossMeters!.toStringAsFixed(0)} m'
+                      : '--',
+                  color: AppTheme.elevation,
+                ),
+              ),
             ],
           ),
-          if (activity.avgHeartRate != null || activity.maxHeartRate != null) ...[
+          if (activity.avgHeartRate != null ||
+              activity.maxHeartRate != null) ...[
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                    child: _MetricTile(
-                  icon: Icons.favorite_rounded,
-                  label: 'Avg HR',
-                  value: activity.avgHeartRate != null
-                      ? '${activity.avgHeartRate} bpm'
-                      : '--',
-                  color: AppTheme.heartRate,
-                )),
+                  child: _MetricTile(
+                    icon: Icons.favorite_rounded,
+                    label: 'Avg HR',
+                    value: activity.avgHeartRate != null
+                        ? '${activity.avgHeartRate} bpm'
+                        : '--',
+                    color: AppTheme.heartRate,
+                  ),
+                ),
                 Expanded(
-                    child: _MetricTile(
-                  icon: Icons.favorite_border_rounded,
-                  label: 'Max HR',
-                  value: activity.maxHeartRate != null
-                      ? '${activity.maxHeartRate} bpm'
-                      : '--',
-                  color: AppTheme.heartRate,
-                )),
+                  child: _MetricTile(
+                    icon: Icons.favorite_border_rounded,
+                    label: 'Max HR',
+                    value: activity.maxHeartRate != null
+                        ? '${activity.maxHeartRate} bpm'
+                        : '--',
+                    color: AppTheme.heartRate,
+                  ),
+                ),
               ],
             ),
           ],
@@ -413,16 +452,12 @@ class _MetricTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
+                Text(label, style: Theme.of(context).textTheme.labelSmall),
                 Text(
                   value,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(color: color),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: color),
                 ),
               ],
             ),
@@ -468,28 +503,31 @@ class _SplitTimesWidget extends StatelessWidget {
               children: [
                 Expanded(
                   flex: 1,
-                  child: Text('km',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: AppTheme.textTertiary)),
+                  child: Text(
+                    'km',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textTertiary,
+                    ),
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Pace',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: AppTheme.textTertiary)),
+                  child: Text(
+                    'Pace',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textTertiary,
+                    ),
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Text('Elev',
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: AppTheme.textTertiary),
-                      textAlign: TextAlign.right),
+                  child: Text(
+                    'Elev',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textTertiary,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
                 ),
               ],
             ),
@@ -502,8 +540,7 @@ class _SplitTimesWidget extends StatelessWidget {
               color: i.isEven
                   ? Colors.transparent
                   : AppTheme.surfaceLight.withValues(alpha: 0.05),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
@@ -511,8 +548,8 @@ class _SplitTimesWidget extends StatelessWidget {
                     child: Text(
                       '${i + 1}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -520,9 +557,9 @@ class _SplitTimesWidget extends StatelessWidget {
                     child: Text(
                       split.formattedPace,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.pace,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: AppTheme.pace,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                   Expanded(
@@ -530,10 +567,10 @@ class _SplitTimesWidget extends StatelessWidget {
                     child: Text(
                       '${split.elevChange >= 0 ? '+' : ''}${split.elevChange.toStringAsFixed(0)}m',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: split.elevChange >= 0
-                                ? AppTheme.elevation
-                                : AppTheme.info,
-                          ),
+                        color: split.elevChange >= 0
+                            ? AppTheme.elevation
+                            : AppTheme.info,
+                      ),
                       textAlign: TextAlign.right,
                     ),
                   ),
@@ -567,10 +604,7 @@ class _SplitTimesWidget extends StatelessWidget {
         final splitElev = b.altitude - points[splitStartIdx].altitude;
         final pace = GpsUtils.calculatePace(1000, splitDuration);
 
-        splits.add(_KmSplit(
-          paceMinPerKm: pace,
-          elevChange: splitElev,
-        ));
+        splits.add(_KmSplit(paceMinPerKm: pace, elevChange: splitElev));
 
         splitStartIdx = i;
         splitStartDist = cumDist;
@@ -616,9 +650,9 @@ class _SectionLabel extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
